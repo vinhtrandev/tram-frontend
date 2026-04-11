@@ -4,7 +4,9 @@
    ================================================ */
 
 const CONFIG = {
-    API_BASE: 'http://localhost:8080/api',
+    API_BASE: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8080/api'
+        : 'https://tram-backend.onrender.com/api',
 
     // Star types
     STAR_TYPES: {
@@ -31,76 +33,13 @@ const CONFIG = {
 
     // Mission IDs
     MISSIONS: [
-        {
-            id: 'void_hold',
-            name: 'Chạm vào hư vô',
-            desc: 'Giữ chuột vào Hố Đen trong 10 giây',
-            reward: 10,
-            icon: '🕳️',
-            type: 'static',
-            daily: true,
-            max: 1
-        },
-        {
-            id: 'breathing',
-            name: 'Hòa nhịp',
-            desc: 'Thực hiện 3 chu kỳ thở (4-4-8)',
-            reward: 30,
-            icon: '🌬️',
-            type: 'static',
-            daily: true,
-            max: 1
-        },
-        {
-            id: 'shooting_star',
-            name: 'Ngắm sao băng',
-            desc: 'Bắt được 1 ngôi sao băng bay qua',
-            reward: 50,
-            icon: '🌠',
-            type: 'static',
-            daily: true,
-            max: 1
-        },
-        {
-            id: 'patient_astronaut',
-            name: 'Phi hành gia kiên nhẫn',
-            desc: 'Ở lại Trạm liên tục trong 30 phút',
-            reward: 100,
-            icon: '🧑‍🚀',
-            type: 'static',
-            daily: true,
-            max: 1
-        },
-        {
-            id: 'read_stars',
-            name: 'Vạn dặm kết nối',
-            desc: 'Đọc tâm tư của 10 ngôi sao',
-            reward: 20,
-            icon: '👁️',
-            type: 'social',
-            daily: true,
-            max: 1
-        },
-        {
-            id: 'light_hope',
-            name: 'Thắp sáng hy vọng',
-            desc: 'Tương tác với một ngôi sao buồn',
-            reward: 25,
-            icon: '🕯️',
-            type: 'social',
-            daily: true,
-            max: 3
-        },
-        {
-            id: 'streak_7',
-            name: 'Kỷ niệm chương',
-            desc: 'Truy cập Trạm liên tục trong 7 ngày',
-            reward: 200,
-            icon: '🏅',
-            type: 'streak',
-            daily: false,
-            max: 999
-        }
+        { id: 'void_hold', name: 'Chạm vào hư vô', desc: 'Giữ chuột vào Hố Đen trong 10 giây', reward: 10, icon: '🕳️', type: 'static', daily: true, max: 1 },
+        { id: 'breathing', name: 'Hòa nhịp', desc: 'Thực hiện 3 chu kỳ thở (4-4-8)', reward: 30, icon: '🌬️', type: 'static', daily: true, max: 1 },
+        { id: 'shooting_star', name: 'Ngắm sao băng', desc: 'Bắt được 1 ngôi sao băng bay qua', reward: 50, icon: '🌠', type: 'static', daily: true, max: 1 },
+        { id: 'patient_astronaut', name: 'Phi hành gia kiên nhẫn', desc: 'Ở lại Trạm liên tục trong 30 phút', reward: 100, icon: '🧑‍🚀', type: 'static', daily: true, max: 1 },
+        { id: 'read_stars', name: 'Vạn dặm kết nối', desc: 'Đọc tâm tư của 10 ngôi sao', reward: 20, icon: '👁️', type: 'social', daily: true, max: 1 },
+        { id: 'light_hope', name: 'Thắp sáng hy vọng', desc: 'Tương tác với một ngôi sao buồn', reward: 25, icon: '🕯️', type: 'social', daily: true, max: 3 },
+        { id: 'streak_7', name: 'Kỷ niệm chương', desc: 'Truy cập Trạm liên tục trong 7 ngày', reward: 200, icon: '🏅', type: 'streak', daily: false, max: 999 }
     ],
 
     // Store items
@@ -136,25 +75,25 @@ const CONFIG = {
     ],
 
     // Timing
-    SHOOTING_STAR_INTERVAL: 15 * 60 * 1000, // 15 minutes
+    SHOOTING_STAR_INTERVAL: 15 * 60 * 1000,
     METEOR_RAIN_INTERVAL: 15 * 60 * 1000,
     VOID_HOLD_DURATION: 10000,
-    PATIENT_DURATION: 30 * 60 * 1000, // 30 minutes
+    PATIENT_DURATION: 30 * 60 * 1000,
 
-    // Negative keywords (for light_hope mission)
+    // Negative keywords
     NEGATIVE_KEYWORDS: ['mệt', 'buồn', 'khóc', 'cô đơn', 'chán', 'tệ', 'sợ', 'lo', 'áp lực', 'stress', 'đau', 'thất bại', 'tuyệt vọng']
 };
 
-// Global state (in-memory, synced to localStorage where needed)
+// Global state
 const STATE = {
-    user: null,          // { id, nickname, token }
+    user: null,
     points: 0,
-    dailyMissions: {},   // { missionId: progress }
-    streak: [],          // array of date strings
+    dailyMissions: {},
+    streak: [],
     starsRead: 0,
     activeStarType: 'normal',
     currentSound: 'rain',
     patientTimer: null,
     patientStart: null,
-    unlocked: {}         // { itemId: true }
+    unlocked: {}
 };
