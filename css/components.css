@@ -1,0 +1,259 @@
+/* ================================================
+   TRẠM GỬI TÍN HIỆU - components.css
+   Reusable component styles
+   ================================================ */
+
+/* ---- GRAINY TEXTURE OVERLAY ---- */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+/* ---- STARS (DOM elements for hover popup) ---- */
+.star-dot {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    z-index: 10;
+}
+
+.star-dot:hover {
+    transform: scale(2.5) !important;
+}
+
+.star-dot.type-normal {
+    background: var(--star-cream);
+}
+
+.star-dot.type-shooting {
+    background: var(--star-ice);
+}
+
+.star-dot.type-bright {
+    background: #fff;
+}
+
+.star-dot.has-react {
+    box-shadow: 0 0 12px 3px rgba(244, 143, 177, 0.6);
+}
+
+/* Star label on hover */
+.star-label {
+    position: absolute;
+    z-index: 50;
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(26, 27, 46, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+/* Particle / dust */
+.dust-particle {
+    position: fixed;
+    border-radius: 50%;
+    z-index: 400;
+    background: var(--accent-gold);
+    animation: dustFly 1.2s ease-out forwards;
+    pointer-events: none;
+}
+
+/* Point gain label */
+.point-gain-label {
+    position: fixed;
+    z-index: 600;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+    pointer-events: none;
+    animation: pointGain 1.2s ease-out forwards;
+}
+
+/* Flying signal particle */
+.signal-particle {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 300;
+    width: 8px;
+    height: 8px;
+    background: radial-gradient(circle, #fff 0%, var(--accent-purple) 100%);
+    box-shadow: 0 0 16px var(--accent-purple);
+    animation: flyUp 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* Meteor overlay line */
+.meteor-line {
+    position: fixed;
+    z-index: 50;
+    width: 3px;
+    height: 80px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.9));
+    pointer-events: all;
+    cursor: pointer;
+    animation: meteorRain 1.2s ease-out forwards;
+    transform-origin: top;
+}
+
+.meteor-line.clickable::after {
+    content: '✨';
+    position: absolute;
+    top: 0;
+    left: -10px;
+    font-size: 1rem;
+}
+
+/* Void absorbed text */
+.void-absorb-text {
+    position: absolute;
+    font-size: 0.65rem;
+    color: rgba(206, 147, 216, 0.7);
+    animation: dustFly 1s ease-out forwards;
+    pointer-events: none;
+    white-space: nowrap;
+    --dx: -20px;
+    --dy: -30px;
+}
+
+/* ---- SCROLLBAR ---- */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(206, 147, 216, 0.3) transparent;
+}
+
+/* ---- SELECTION ---- */
+::selection {
+    background: rgba(206, 147, 216, 0.3);
+    color: #fff;
+}
+
+/* ---- GOLD RING EFFECT on points update ---- */
+.points-ring {
+    position: fixed;
+    border-radius: 50%;
+    border: 2px solid var(--accent-gold);
+    pointer-events: none;
+    z-index: 601;
+    animation: ringExpand 0.7s ease-out forwards;
+}
+
+@keyframes ringExpand {
+    0% {
+        width: 10px;
+        height: 10px;
+        opacity: 1;
+    }
+
+    100% {
+        width: 60px;
+        height: 60px;
+        opacity: 0;
+    }
+}
+
+/* ---- Community counter ---- */
+.community-counter {
+    text-align: center;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.community-counter .count {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+    display: block;
+}
+
+.community-counter .label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+/* ---- VOID HOLD progress overlay ---- */
+.void-container {
+    position: relative;
+}
+
+.void-container .void-timer {
+    pointer-events: none;
+}
+
+/* ---- NAVIGATION NAV (minimal top bar) ---- */
+.top-nav-spacer {
+    height: 70px;
+}
+
+/* ---- ASMR badge ---- */
+.asmr-badge {
+    position: fixed;
+    bottom: 200px;
+    right: 20px;
+    z-index: 100;
+    padding: 8px 14px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    background: var(--glass-bg);
+    backdrop-filter: var(--blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+}
+
+.asmr-badge .asmr-title {
+    font-size: 0.7rem;
+    color: var(--accent-purple);
+    margin-bottom: 4px;
+    display: block;
+}
+
+/* ---- UNLOCK animation ---- */
+@keyframes unlockFlash {
+    0% {
+        box-shadow: 0 0 0 rgba(255, 213, 79, 0);
+    }
+
+    50% {
+        box-shadow: 0 0 40px rgba(255, 213, 79, 0.6);
+    }
+
+    100% {
+        box-shadow: 0 0 0 rgba(255, 213, 79, 0);
+    }
+}
+
+.store-item.just-unlocked {
+    animation: unlockFlash 0.8s ease;
+}
+
+/* ---- Mission complete flash ---- */
+.mission-item.just-done .mission-star {
+    animation: starBurst 0.6s ease;
+}
+
+/* ---- Mobile tap highlight ---- */
+@media (hover: none) {
+    .star-dot:active {
+        transform: scale(3) !important;
+    }
+
+    .react-btn:active {
+        transform: scale(1.3);
+    }
+}

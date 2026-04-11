@@ -1,0 +1,160 @@
+/* ================================================
+   TRẠM GỬI TÍN HIỆU - config.js
+   App-wide constants & configuration
+   ================================================ */
+
+const CONFIG = {
+    API_BASE: 'http://localhost:8080/api',
+
+    // Star types
+    STAR_TYPES: {
+        normal: { emoji: '⭐', label: 'Ngôi sao', size: [3, 5], color: '#FFFDE7' },
+        shooting: { emoji: '💫', label: 'Sao băng', size: [3, 4], color: '#E1F5FE' },
+        bright: { emoji: '🌟', label: 'Bắc Đẩu', size: [5, 8], color: '#FFFFFF' }
+    },
+
+    // Points
+    POINTS: {
+        SEND_SIGNAL: 5,
+        VOID_HOLD: 10,
+        SHOOTING_STAR: 50,
+        BREATHING: 30,
+        PATIENT_ASTRONAUT: 100,
+        READ_10_STARS: 20,
+        LIGHT_HOPE: 25,
+        SHARE: 40,
+        STREAK_1_3: 20,
+        STREAK_4_6: 50,
+        STREAK_7: 200,
+        REACTION_RECEIVE: 3
+    },
+
+    // Mission IDs
+    MISSIONS: [
+        {
+            id: 'void_hold',
+            name: 'Chạm vào hư vô',
+            desc: 'Giữ chuột vào Hố Đen trong 10 giây',
+            reward: 10,
+            icon: '🕳️',
+            type: 'static',
+            daily: true,
+            max: 1
+        },
+        {
+            id: 'breathing',
+            name: 'Hòa nhịp',
+            desc: 'Thực hiện 3 chu kỳ thở (4-4-8)',
+            reward: 30,
+            icon: '🌬️',
+            type: 'static',
+            daily: true,
+            max: 1
+        },
+        {
+            id: 'shooting_star',
+            name: 'Ngắm sao băng',
+            desc: 'Bắt được 1 ngôi sao băng bay qua',
+            reward: 50,
+            icon: '🌠',
+            type: 'static',
+            daily: true,
+            max: 1
+        },
+        {
+            id: 'patient_astronaut',
+            name: 'Phi hành gia kiên nhẫn',
+            desc: 'Ở lại Trạm liên tục trong 30 phút',
+            reward: 100,
+            icon: '🧑‍🚀',
+            type: 'static',
+            daily: true,
+            max: 1
+        },
+        {
+            id: 'read_stars',
+            name: 'Vạn dặm kết nối',
+            desc: 'Đọc tâm tư của 10 ngôi sao',
+            reward: 20,
+            icon: '👁️',
+            type: 'social',
+            daily: true,
+            max: 1
+        },
+        {
+            id: 'light_hope',
+            name: 'Thắp sáng hy vọng',
+            desc: 'Tương tác với một ngôi sao buồn',
+            reward: 25,
+            icon: '🕯️',
+            type: 'social',
+            daily: true,
+            max: 3
+        },
+        {
+            id: 'streak_7',
+            name: 'Kỷ niệm chương',
+            desc: 'Truy cập Trạm liên tục trong 7 ngày',
+            reward: 200,
+            icon: '🏅',
+            type: 'streak',
+            daily: false,
+            max: 999
+        }
+    ],
+
+    // Store items
+    STORE: {
+        experience: [
+            { id: 'trail_star', name: 'Đuôi sao lấp lánh', price: 300, desc: 'Ngôi sao bạn gửi sẽ có đuôi sáng như sao băng', icon: '✨' },
+            { id: 'halo_star', name: 'Hào quang ngũ sắc', price: 500, desc: 'Sao của bạn tỏa hào quang 5 màu rực rỡ', icon: '🌈' },
+            { id: 'sound_rain', name: 'Tiếng mưa Đà Lạt', price: 100, desc: 'Mở khóa tiếng thông reo & mưa đêm Đà Lạt', icon: '🌧️' },
+            { id: 'sound_wave', name: 'Tiếng sóng đêm', price: 150, desc: 'Mở khóa tiếng sóng vỗ mạn thuyền trong đêm', icon: '🌊' },
+            { id: 'sound_wind', name: 'Chuông gió ngân xa', price: 200, desc: 'Mở khóa tiếng chuông gió nhẹ nhàng', icon: '🔔' },
+            { id: 'future_letter', name: 'Lá thư tương lai', price: 800, desc: 'Viết thư cho mình & nhận lại sau 1 tháng qua web', icon: '📮' },
+            { id: 'meditation', name: 'Hướng dẫn thiền định', price: 1000, desc: 'Mở khóa các bài dẫn thiền ngắn giải tỏa tức thì', icon: '🧘' }
+        ],
+        real: [
+            { id: 'voucher_cafe', name: 'Voucher "Góc Yên Tĩnh"', price: 1500, desc: 'Giảm 15-20% tại quán cafe sách & tiệm trà đối tác', icon: '☕' },
+            { id: 'gift_box', name: 'Hộp quà "Tín Hiệu"', price: 3500, desc: 'Bộ Kit: nến thơm, sáp thơm, trà hoa & lá thư ẩn danh gửi về nhà', icon: '📦' }
+        ],
+        community: [
+            { id: 'plant_tree', name: 'Gieo mầm hy vọng', price: 5000, desc: 'Nhóm dự án thay bạn trồng 1 cây xanh tại khu phòng hộ', icon: '🌱' },
+            { id: 'meal_children', name: 'Bữa cơm ấm áp', price: 7000, desc: 'Quy đổi thành suất ăn cho trẻ em mái ấm. Nhận chứng nhận "Sứ giả ánh sáng"', icon: '🍚' }
+        ]
+    },
+
+    // Healing quotes
+    QUOTES: [
+        'Thế giới ngoài kia ồn ào quá, cảm ơn bạn đã chọn dừng chân ở đây một chút.',
+        'Đừng lo lắng về những gì bạn chưa làm được. Đêm nay, việc duy nhất bạn cần làm là bình yên.',
+        'Mỗi ngôi sao bạn thắp sáng trên đây là một niềm tin gửi đến tương lai.',
+        'Hơi thở của bạn là món quà quý giá nhất. Hãy trân trọng nó ngay lúc này.',
+        'Em đã làm rất tốt hôm nay rồi, nghỉ ngơi một chút nhé.',
+        'Bạn không cô đơn. Hàng ngàn ngôi sao đang lắng nghe bạn đây.',
+        'Chỉ cần bạn ở đây, hít thở, và tin rằng mọi thứ sẽ ổn.'
+    ],
+
+    // Timing
+    SHOOTING_STAR_INTERVAL: 15 * 60 * 1000, // 15 minutes
+    METEOR_RAIN_INTERVAL: 15 * 60 * 1000,
+    VOID_HOLD_DURATION: 10000,
+    PATIENT_DURATION: 30 * 60 * 1000, // 30 minutes
+
+    // Negative keywords (for light_hope mission)
+    NEGATIVE_KEYWORDS: ['mệt', 'buồn', 'khóc', 'cô đơn', 'chán', 'tệ', 'sợ', 'lo', 'áp lực', 'stress', 'đau', 'thất bại', 'tuyệt vọng']
+};
+
+// Global state (in-memory, synced to localStorage where needed)
+const STATE = {
+    user: null,          // { id, nickname, token }
+    points: 0,
+    dailyMissions: {},   // { missionId: progress }
+    streak: [],          // array of date strings
+    starsRead: 0,
+    activeStarType: 'normal',
+    currentSound: 'rain',
+    patientTimer: null,
+    patientStart: null,
+    unlocked: {}         // { itemId: true }
+};

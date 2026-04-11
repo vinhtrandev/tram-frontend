@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trạm Gửi Tín Hiệu ✦</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600&family=Playfair+Display:ital@0;1&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/animations.css" />
+    <link rel="stylesheet" href="css/components.css" />
+</head>
+
+<body>
+
+    <!-- ========== LANDING SCREEN ========== -->
+    <div id="landing-screen" class="screen active">
+        <canvas id="landing-stars"></canvas>
+        <div class="landing-center">
+            <div class="portal" id="portal">
+                <div class="portal-ring r1"></div>
+                <div class="portal-ring r2"></div>
+                <div class="portal-ring r3"></div>
+                <div class="portal-core"></div>
+            </div>
+            <p class="landing-text typewriter" id="landing-text"></p>
+            <button class="btn-connect" id="btn-enter">✦ Kết nối với Vũ trụ</button>
+        </div>
+    </div>
+
+    <!-- ========== AUTH MODAL ========== -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-glass">
+            <div class="modal-header">
+                <span class="modal-star">✦</span>
+                <h2>Lời cam kết bảo mật</h2>
+                <p>Trạm không lưu giữ danh tính thực. Hãy giữ chìa khóa này cẩn thận.</p>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Quay về Trạm</button>
+                <button class="auth-tab" data-tab="register">Tạo danh tính mới</button>
+            </div>
+            <div class="auth-form">
+                <div class="input-group">
+                    <label>🌙 Mật danh của bạn</label>
+                    <input type="text" id="auth-username" placeholder="Nhập mật danh..." maxlength="30" />
+                </div>
+                <div class="input-group">
+                    <label>🔑 Chìa khóa bí mật</label>
+                    <input type="password" id="auth-password" placeholder="Chìa khóa..." />
+                </div>
+                <p class="auth-error hidden" id="auth-error"></p>
+                <button class="btn-auth" id="btn-auth-submit">Bước vào Trạm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MAIN DASHBOARD ========== -->
+    <div id="main-screen" class="screen hidden">
+        <canvas id="star-canvas"></canvas>
+
+        <!-- ===== TOP NAVBAR ===== -->
+        <nav class="top-navbar glass">
+            <div class="nav-logo">
+                <span class="nav-logo-icon">🔭</span>
+                <span class="nav-logo-text">TRẠM GỬI TÍN HIỆU</span>
+            </div>
+            <div class="nav-links">
+                <button class="nav-link active" data-section="universe">Vũ Trụ</button>
+                <button class="nav-link" id="btn-missions">Nhiệm Vụ</button>
+                <button class="nav-link" id="btn-store">Star Store</button>
+                <button class="nav-link" id="btn-heal">Chữa Lành</button>
+            </div>
+            <div class="nav-right">
+                <div class="nav-user">
+                    <span class="nav-nickname" id="user-nickname">STAR_99</span>
+                    <span class="nav-points"><span id="user-points">0</span> ✨ Tinh Tú</span>
+                </div>
+                <button class="nav-bell" title="Thông báo">🔔</button>
+                <button class="nav-logout hud-btn" id="btn-logout" title="Rời Trạm">⟵</button>
+            </div>
+        </nav>
+
+        <!-- ===== CENTER INPUT AREA ===== -->
+        <div class="center-input-area">
+            <p class="center-input-label">Hôm nay, bạn muốn gửi gì tới vũ trụ?</p>
+            <div class="center-input-box glass">
+                <textarea id="signal-text" placeholder="Hãy viết một tâm tư, một điều ước, hoặc một lời cảm ơn..."
+                    maxlength="200"></textarea>
+                <div class="center-input-footer">
+                    <div class="star-type-selector">
+                        <button class="star-type active" data-type="normal" title="Ngôi sao thường">⭐</button>
+                        <button class="star-type" data-type="shooting" title="Sao băng">💫</button>
+                        <button class="star-type" data-type="bright" title="Sao Bắc Đẩu">🌟</button>
+                    </div>
+                    <span class="char-count"><span id="char-count">0</span>/200</span>
+                    <button class="btn-send" id="btn-send">Gửi Tín Hiệu (+5 ✨)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== VOID - Hố Đen (bottom left) ===== -->
+        <div class="void-container" id="void-container">
+            <div class="void-label">Hố Đen</div>
+            <div class="void" id="void">
+                <div class="void-spiral"></div>
+                <div class="void-core"></div>
+            </div>
+            <div class="void-hint">Giữ 10s để buông bỏ</div>
+            <div class="void-timer hidden" id="void-timer">
+                <svg viewBox="0 0 60 60">
+                    <circle cx="30" cy="30" r="26" class="timer-track" />
+                    <circle cx="30" cy="30" r="26" class="timer-progress" id="timer-progress" />
+                </svg>
+                <span id="void-count">10</span>
+            </div>
+        </div>
+
+        <!-- ===== SOUND PANEL (bottom right) ===== -->
+        <div class="sound-panel glass" id="sound-panel">
+            <span class="sound-label">🎵 ASMR</span>
+            <div class="sound-btns">
+                <button class="sound-btn active" data-sound="rain" title="Tiếng mưa">🌧 Mưa</button>
+                <button class="sound-btn" data-sound="wave" title="Sóng biển">🌊 Sóng</button>
+                <button class="sound-btn" data-sound="wind" title="Chuông gió">🔔 Chuông</button>
+                <button class="sound-btn" data-sound="off" title="Tắt âm">🔇</button>
+            </div>
+        </div>
+
+        <!-- ===== MISSIONS PANEL (side) ===== -->
+        <div class="side-panel glass hidden" id="missions-panel">
+            <div class="panel-header">
+                <h3>🎯 Nhiệm vụ Săn Sao</h3>
+                <button class="panel-close" id="close-missions">✕</button>
+            </div>
+            <div class="missions-list" id="missions-list"></div>
+            <div class="streak-section">
+                <h4>📅 Điểm danh tuần</h4>
+                <div class="streak-days-mini" id="streak-mini"></div>
+            </div>
+        </div>
+
+        <!-- ===== STORE PANEL (side) ===== -->
+        <div class="side-panel glass hidden" id="store-panel">
+            <div class="panel-header">
+                <h3>✦ Star Store</h3>
+                <button class="panel-close" id="close-store">✕</button>
+            </div>
+            <div class="store-tabs">
+                <button class="store-tab active" data-tab="experience">🌌 Trải nghiệm</button>
+                <button class="store-tab" data-tab="real">🎁 Thực tế</button>
+                <button class="store-tab" data-tab="community">🌱 Gieo mầm</button>
+            </div>
+            <div class="store-content" id="store-content"></div>
+        </div>
+
+        <!-- ===== BREATHING OVERLAY ===== -->
+        <div class="breathing-overlay hidden" id="breathing-overlay">
+            <div class="breathing-circle" id="breathing-circle">
+                <span id="breathing-text">Hít vào</span>
+            </div>
+            <p class="breathing-info" id="breathing-info">Chu kỳ 1/3</p>
+            <button class="btn-skip" id="btn-skip-breathing">Bỏ qua</button>
+        </div>
+
+        <!-- ===== TOAST ===== -->
+        <div class="toast-container" id="toast-container"></div>
+
+        <!-- ===== SHOOTING STAR HINT ===== -->
+        <div class="shooting-star-hint hidden" id="shooting-hint">✨ Bắt ngôi sao băng!</div>
+
+        <!-- ===== STAR POPUP ===== -->
+        <div class="star-popup glass hidden" id="star-popup">
+            <div class="star-popup-header">
+                <span class="anon-label">Anonymous ✦</span>
+                <button class="popup-close" id="popup-close">✕</button>
+            </div>
+            <p class="star-popup-text" id="star-popup-text"></p>
+            <div class="reaction-btns">
+                <button class="react-btn" data-reaction="listen" title="Mình đang lắng nghe bạn">🕯️</button>
+                <button class="react-btn" data-reaction="hug" title="Gửi bạn một cái ôm">❤️</button>
+                <button class="react-btn" data-reaction="strong" title="Chúc bạn mạnh mẽ">⚡</button>
+            </div>
+            <div class="react-labels">
+                <span>Lắng nghe</span><span>Gửi cái ôm</span><span>Mạnh mẽ</span>
+            </div>
+        </div>
+
+        <!-- ===== PATIENT ASTRONAUT TIMER ===== -->
+        <div class="astronaut-timer glass hidden" id="astronaut-timer">
+            <div class="astro-icon">🧑‍🚀</div>
+            <div class="astro-info">
+                <span>Phi hành gia kiên nhẫn</span>
+                <div class="astro-progress-bar">
+                    <div id="astro-bar"></div>
+                </div>
+                <span id="astro-time">30:00</span>
+            </div>
+        </div>
+
+        <!-- Legacy telescope (hidden, kept for JS compatibility) -->
+        <div class="telescope-area hidden" id="telescope-area">
+            <div class="telescope-icon" id="telescope-icon"><span>🔭</span></div>
+            <div class="input-panel glass hidden" id="input-panel"></div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/canvas.js"></script>
+    <script src="js/stars.js"></script>
+    <script src="js/missions.js"></script>
+    <script src="js/store.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
