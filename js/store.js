@@ -29,7 +29,6 @@ const Store = (() => {
         const items = CONFIG.STORE[currentTab] || [];
         el.innerHTML = '';
 
-        // Community tab: show counter
         if (currentTab === 'community') {
             const total = parseInt(localStorage.getItem('tram_trees') || '0');
             const cc = document.createElement('div');
@@ -54,7 +53,7 @@ const Store = (() => {
                 ${isUnlocked ? 'disabled' : ''}
                 data-id="${item.id}"
                 data-price="${item.price}">
-          ${isUnlocked ? '✓ Đã mở khóa' : `Mở khóa bằng ✨`}
+          ${isUnlocked ? '✓ Đã mở khóa' : 'Mở khóa bằng ✨'}
         </button>
       `;
             if (!isUnlocked && !canAfford) {
@@ -65,33 +64,75 @@ const Store = (() => {
             el.appendChild(div);
         });
 
-        // Bind unlock buttons
         el.querySelectorAll('.btn-unlock:not([disabled])').forEach(btn => {
             btn.addEventListener('click', () => _unlock(btn.dataset.id, parseInt(btn.dataset.price)));
         });
     }
 
-    function _unlock(itemId, price) {
+    async function _unlock(itemId, price) {
         if (STATE.points < price) {
             UI.showToast('❌ Chưa đủ ✨ Tinh Tú để mở khóa!');
             return;
         }
+
+        // Offline / local mode fallback
+        if (!STATE.user?.token || STATE.user.token === 'local') {
+            _unlockLocal(itemId, price);
+            return;
+        }
+
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/auth/unlock`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${STATE.user.token}`
+                },
+                body: JSON.stringify({ itemId, price: price.toString() })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                UI.showToast(`❌ ${err.message}`);
+                return;
+            }
+
+            const data = await res.json();
+
+            // ✅ Cập nhật state từ server
+            STATE.points = data.points;
+            const unlockedArr = data.unlockedItems
+                ? data.unlockedItems.split(',').filter(Boolean)
+                : [];
+            STATE.unlocked = {};
+            unlockedArr.forEach(id => STATE.unlocked[id] = true);
+            Auth.saveState();
+
+            _afterUnlock(itemId);
+
+        } catch {
+            // Nếu mất mạng thì fallback local
+            _unlockLocal(itemId, price);
+        }
+    }
+
+    function _unlockLocal(itemId, price) {
         STATE.unlocked[itemId] = true;
         UI.addPoints(-price);
         Auth.saveState();
+        _afterUnlock(itemId);
+    }
 
-        // Community items: log
+    function _afterUnlock(itemId) {
         if (itemId === 'plant_tree') {
             const t = parseInt(localStorage.getItem('tram_trees') || '0') + 1;
             localStorage.setItem('tram_trees', t);
         }
-
-        // Flash effect
         const itemEl = document.getElementById(`store-item-${itemId}`);
         if (itemEl) itemEl.classList.add('just-unlocked');
-
         UI.showToast('🎉 Mở khóa thành công! Tận hưởng phần thưởng của bạn nhé.');
-        _renderContent(); // refresh
+        UI.updatePointsDisplay();
+        _renderContent();
     }
 
     return { init };

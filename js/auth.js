@@ -5,14 +5,12 @@
 
 const Auth = (() => {
 
-    /* ---------- STORAGE KEYS ---------- */
     const KEY_USER = 'tram_user';
     const KEY_POINTS = 'tram_points';
     const KEY_MISSIONS = 'tram_missions';
     const KEY_STREAK = 'tram_streak';
     const KEY_UNLOCKED = 'tram_unlocked';
 
-    /* ---------- SESSION CHECK ---------- */
     function loadSession() {
         const raw = localStorage.getItem(KEY_USER);
         if (!raw) return false;
@@ -27,7 +25,6 @@ const Auth = (() => {
         } catch { return false; }
     }
 
-    /* ---------- SAVE STATE ---------- */
     function saveState() {
         if (!STATE.user) return;
         localStorage.setItem(KEY_POINTS, STATE.points);
@@ -36,7 +33,6 @@ const Auth = (() => {
         localStorage.setItem(KEY_UNLOCKED, JSON.stringify(STATE.unlocked));
     }
 
-    /* ---------- REGISTER ---------- */
     async function register(nickname, password) {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/auth/register`, {
@@ -49,15 +45,13 @@ const Auth = (() => {
                 throw new Error(err.message || 'Đăng ký thất bại');
             }
             const data = await res.json();
-            return _saveUser(data, nickname);
+            return _saveUser(data);
         } catch (e) {
-            // Offline fallback: local-only mode
             if (e.name === 'TypeError') return _localMode(nickname, password);
             throw e;
         }
     }
 
-    /* ---------- LOGIN ---------- */
     async function login(nickname, password) {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/auth/login`, {
@@ -70,36 +64,42 @@ const Auth = (() => {
                 throw new Error(err.message || 'Sai mật danh hoặc chìa khóa');
             }
             const data = await res.json();
-            return _saveUser(data, nickname);
+            return _saveUser(data);
         } catch (e) {
             if (e.name === 'TypeError') return _localMode(nickname, password);
             throw e;
         }
     }
 
-    /* Local-only mode when server unavailable */
+    function _saveUser(data) {
+        const user = { id: data.id, nickname: data.nickname, token: data.token };
+        STATE.user = user;
+        STATE.points = data.points || 0;
+
+        // ✅ Load unlocked từ server
+        const unlockedArr = data.unlockedItems
+            ? data.unlockedItems.split(',').filter(Boolean)
+            : [];
+        STATE.unlocked = {};
+        unlockedArr.forEach(id => STATE.unlocked[id] = true);
+
+        localStorage.setItem(KEY_USER, JSON.stringify(user));
+        localStorage.setItem(KEY_POINTS, STATE.points);
+        localStorage.setItem(KEY_UNLOCKED, JSON.stringify(STATE.unlocked));
+        return true;
+    }
+
     function _localMode(nickname, password) {
         const stored = localStorage.getItem(KEY_USER);
         if (stored) {
             const u = JSON.parse(stored);
             if (u.nickname !== nickname) throw new Error('Sai mật danh hoặc chìa khóa');
-            // simple hash check
             if (u.pwHash !== _hash(password)) throw new Error('Sai mật danh hoặc chìa khóa');
         } else {
-            // new user in local mode
             const u = { id: Date.now(), nickname, pwHash: _hash(password), token: 'local' };
             localStorage.setItem(KEY_USER, JSON.stringify(u));
         }
         loadSession();
-        return true;
-    }
-
-    function _saveUser(data, nickname) {
-        const user = { id: data.id, nickname: data.nickname || nickname, token: data.token };
-        STATE.user = user;
-        STATE.points = data.points || 0;
-        localStorage.setItem(KEY_USER, JSON.stringify(user));
-        localStorage.setItem(KEY_POINTS, STATE.points);
         return true;
     }
 
@@ -109,14 +109,14 @@ const Auth = (() => {
         return h.toString(16);
     }
 
-    /* ---------- LOGOUT ---------- */
     function logout() {
         saveState();
         localStorage.removeItem(KEY_USER);
+        localStorage.removeItem(KEY_UNLOCKED);
         STATE.user = null;
+        STATE.unlocked = {};
     }
 
-    /* ---------- INIT UI ---------- */
     function initAuthUI() {
         const modal = document.getElementById('auth-modal');
         const tabs = document.querySelectorAll('.auth-tab');
@@ -157,7 +157,6 @@ const Auth = (() => {
             }
         });
 
-        // Enter key
         document.getElementById('auth-password').addEventListener('keydown', e => {
             if (e.key === 'Enter') btnSubmit.click();
         });
