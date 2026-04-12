@@ -65,19 +65,14 @@ const Store = (() => {
         });
 
         el.querySelectorAll('.btn-unlock:not([disabled])').forEach(btn => {
-            btn.addEventListener('click', () => _unlock(btn.dataset.id, parseInt(btn.dataset.price)));
+            btn.addEventListener('click', () => _unlock(btn.dataset.id));
         });
     }
 
-    async function _unlock(itemId, price) {
-        if (STATE.points < price) {
-            UI.showToast('❌ Chưa đủ ✨ Tinh Tú để mở khóa!');
-            return;
-        }
-
+    async function _unlock(itemId) {
         // Offline / local mode fallback
         if (!STATE.user?.token || STATE.user.token === 'local') {
-            _unlockLocal(itemId, price);
+            UI.showToast('❌ Cần kết nối server để mở khóa!');
             return;
         }
 
@@ -88,7 +83,7 @@ const Store = (() => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${STATE.user.token}`
                 },
-                body: JSON.stringify({ itemId, price: price.toString() })
+                body: JSON.stringify({ itemId })
             });
 
             if (!res.ok) {
@@ -108,31 +103,21 @@ const Store = (() => {
             unlockedArr.forEach(id => STATE.unlocked[id] = true);
             Auth.saveState();
 
-            _afterUnlock(itemId);
+            if (itemId === 'plant_tree') {
+                const t = parseInt(localStorage.getItem('tram_trees') || '0') + 1;
+                localStorage.setItem('tram_trees', t);
+            }
+
+            const itemEl = document.getElementById(`store-item-${itemId}`);
+            if (itemEl) itemEl.classList.add('just-unlocked');
+
+            UI.showToast('🎉 Mở khóa thành công! Tận hưởng phần thưởng của bạn nhé.');
+            UI.updateHUD();
+            _renderContent();
 
         } catch {
-            // Nếu mất mạng thì fallback local
-            _unlockLocal(itemId, price);
+            UI.showToast('❌ Lỗi kết nối, thử lại sau!');
         }
-    }
-
-    function _unlockLocal(itemId, price) {
-        STATE.unlocked[itemId] = true;
-        UI.addPoints(-price);
-        Auth.saveState();
-        _afterUnlock(itemId);
-    }
-
-    function _afterUnlock(itemId) {
-        if (itemId === 'plant_tree') {
-            const t = parseInt(localStorage.getItem('tram_trees') || '0') + 1;
-            localStorage.setItem('tram_trees', t);
-        }
-        const itemEl = document.getElementById(`store-item-${itemId}`);
-        if (itemEl) itemEl.classList.add('just-unlocked');
-        UI.showToast('🎉 Mở khóa thành công! Tận hưởng phần thưởng của bạn nhé.');
-        UI.updatePointsDisplay();
-        _renderContent();
     }
 
     return { init };

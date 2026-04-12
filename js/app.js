@@ -5,12 +5,10 @@
 
 const App = (() => {
 
-    /* ---------- BOOT ---------- */
     function boot() {
         Canvas.initLanding();
         Auth.initAuthUI();
 
-        // Auto-login from saved session
         if (Auth.loadSession()) {
             _showLanding(true);
         } else {
@@ -18,7 +16,6 @@ const App = (() => {
         }
     }
 
-    /* ---------- LANDING ---------- */
     function _showLanding(hasSession) {
         const landing = document.getElementById('landing-screen');
         landing.classList.add('active');
@@ -34,17 +31,14 @@ const App = (() => {
         });
     }
 
-    /* ---------- AFTER AUTH ---------- */
     function enterMain() {
         _transitionToMain();
     }
 
-    /* ---------- MAIN SCREEN ---------- */
     async function _transitionToMain() {
         const landing = document.getElementById('landing-screen');
         const main = document.getElementById('main-screen');
 
-        // Fade out landing
         landing.style.opacity = '0';
         landing.style.pointerEvents = 'none';
 
@@ -52,7 +46,6 @@ const App = (() => {
         landing.classList.remove('active');
         landing.style.display = 'none';
 
-        // Show main
         main.classList.remove('hidden');
         main.style.opacity = '0';
         await _sleep(50);
@@ -63,7 +56,10 @@ const App = (() => {
         _initMain();
     }
 
-    function _initMain() {
+    async function _initMain() {
+        // ✅ Sync data từ server trước khi render UI
+        await Auth.syncFromServer();
+
         // Canvas
         Canvas.initMain();
 
@@ -82,7 +78,7 @@ const App = (() => {
         Stars.startShootingStarCycle();
         Stars.startMeteorRain();
 
-        // Center input box (new layout)
+        // Center input box
         _initCenterInput();
 
         // Sound
@@ -93,7 +89,6 @@ const App = (() => {
             UI.showToast('💫 ' + CONFIG.QUOTES[0], 5000);
         }, 30000);
     }
-
 
     function _initCenterInput() {
         const textarea = document.getElementById('signal-text');
@@ -125,7 +120,6 @@ const App = (() => {
 
     function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-    // Boot on DOM ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', boot);
     } else {

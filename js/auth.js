@@ -25,6 +25,28 @@ const Auth = (() => {
         } catch { return false; }
     }
 
+    // ✅ Sync points và unlocked từ server
+    async function syncFromServer() {
+        if (!STATE.user?.token || STATE.user.token === 'local') return;
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/auth/me`, {
+                headers: { 'Authorization': `Bearer ${STATE.user.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+
+            STATE.points = data.points;
+            const unlockedArr = data.unlockedItems
+                ? data.unlockedItems.split(',').filter(Boolean)
+                : [];
+            STATE.unlocked = {};
+            unlockedArr.forEach(id => STATE.unlocked[id] = true);
+
+            localStorage.setItem(KEY_POINTS, STATE.points);
+            localStorage.setItem(KEY_UNLOCKED, JSON.stringify(STATE.unlocked));
+        } catch { /* offline, dùng localStorage */ }
+    }
+
     function saveState() {
         if (!STATE.user) return;
         localStorage.setItem(KEY_POINTS, STATE.points);
@@ -167,5 +189,5 @@ const Auth = (() => {
         }
     }
 
-    return { loadSession, saveState, login, register, logout, initAuthUI };
+    return { loadSession, saveState, login, register, logout, initAuthUI, syncFromServer };
 })();

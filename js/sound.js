@@ -48,9 +48,9 @@ const Sound = (() => {
 
     function _createWindChime() {
         const c = _getCtx();
-        const notes = [523, 659, 784, 880, 1047]; // C5 E5 G5 A5 C6
+        const notes = [523, 659, 784, 880, 1047];
         const merger = c.createChannelMerger(1);
-        const src = { start: () => { }, stop: () => { } }; // dummy
+        const src = { start: () => { }, stop: () => { } };
 
         function ring() {
             if (!ctx) return;
@@ -110,7 +110,6 @@ const Sound = (() => {
 
             osc.type = 'sine'; osc.frequency.value = freq;
 
-            // Reverb
             const rvBuf = c.createBuffer(2, c.sampleRate * 3, c.sampleRate);
             [0, 1].forEach(ch => {
                 const d = rvBuf.getChannelData(ch);
@@ -131,19 +130,51 @@ const Sound = (() => {
         } catch { }
     }
 
+    /* ---------- SOUND → ITEM ID MAP ---------- */
+    const SOUND_ITEM_MAP = {
+        'rain': 'sound_rain',
+        'wave': 'sound_wave',
+        'wind': 'sound_wind'
+    };
+
+    /* ---------- CHECK UNLOCK ---------- */
+    function _isUnlocked(type) {
+        if (type === 'off') return true;
+        const itemId = SOUND_ITEM_MAP[type];
+        if (!itemId) return true; // unknown type, allow
+        return !!STATE.unlocked[itemId];
+    }
+
     /* ---------- INIT SOUND BUTTONS ---------- */
     function initButtons() {
         document.querySelectorAll('.sound-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                const type = btn.dataset.sound;
+
+                // ✅ Check unlock
+                if (!_isUnlocked(type)) {
+                    UI.showToast('🔒 Mở khóa âm thanh này trong Star Store!');
+                    return;
+                }
+
                 document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
-                const type = btn.dataset.sound;
                 STATE.currentSound = type;
                 playAmbient(type);
             });
         });
-        // Start default
-        playAmbient(STATE.currentSound);
+
+        // ✅ Chỉ auto-play nếu đã unlock
+        if (_isUnlocked(STATE.currentSound)) {
+            playAmbient(STATE.currentSound);
+        } else {
+            // Default về 'off' nếu chưa unlock
+            STATE.currentSound = 'off';
+            document.querySelectorAll('.sound-btn').forEach(b => {
+                if (b.dataset.sound === 'off') b.classList.add('active');
+                else b.classList.remove('active');
+            });
+        }
     }
 
     return { playAmbient, stop, playSinewave, initButtons };
