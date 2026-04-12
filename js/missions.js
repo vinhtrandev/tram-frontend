@@ -1,7 +1,6 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - missions.js
+   TRẠM GỬI TÍN HIỆU - missions.js (FIXED & HOÀN CHỈNH)
    Mission system: daily missions + weekly streak
-   Void hold, breathing exercise, patient astronaut
    ================================================ */
 
 const Missions = (() => {
@@ -25,7 +24,8 @@ const Missions = (() => {
     /* ---------- DAILY RESET ---------- */
     function _resetDailyIfNeeded() {
         const today = _today();
-        if (STATE.dailyMissions._date !== today) {
+        // Đảm bảo STATE.dailyMissions tồn tại
+        if (!STATE.dailyMissions || STATE.dailyMissions._date !== today) {
             STATE.dailyMissions = { _date: today };
             Auth.saveState();
         }
@@ -80,7 +80,10 @@ const Missions = (() => {
         if (!btn) return;
         btn.addEventListener('click', () => {
             if (btn.dataset.action === 'breathing') _startBreathing();
-            if (btn.dataset.action === 'void_hold') { document.getElementById('void').dispatchEvent(new MouseEvent('mousedown')); }
+            if (btn.dataset.action === 'void_hold') {
+                const voidEl = document.getElementById('void');
+                if (voidEl) voidEl.dispatchEvent(new MouseEvent('mousedown'));
+            }
             if (btn.dataset.action === 'astronaut') _startAstronaut();
         });
     }
@@ -89,9 +92,16 @@ const Missions = (() => {
     function progress(id, value) {
         const m = CONFIG.MISSIONS.find(m => m.id === id);
         if (!m || _isDone(id)) return;
+
+        // Đảm bảo STATE.dailyMissions tồn tại
+        if (!STATE.dailyMissions) STATE.dailyMissions = { _date: _today() };
+
         STATE.dailyMissions[id] = value;
-        if (m.max && value >= m.max) complete(id);
-        else _updateBar(id, value, m.max);
+        if (m.max && value >= m.max) {
+            complete(id);
+        } else {
+            _updateBar(id, value, m.max);
+        }
         Auth.saveState();
     }
 
@@ -99,24 +109,40 @@ const Missions = (() => {
         if (_isDone(id)) return;
         const m = CONFIG.MISSIONS.find(m => m.id === id);
         if (!m) return;
+
+        // Đảm bảo STATE.dailyMissions tồn tại
+        if (!STATE.dailyMissions) STATE.dailyMissions = { _date: _today() };
+
         STATE.dailyMissions[id + '_done'] = true;
         STATE.dailyMissions[id] = m.max || 1;
+
+        // FIX: Đảm bảo points là số hợp lệ trước khi cộng
         UI.addPoints(m.reward);
+
         UI.showToast(`✅ ${m.name} hoàn thành! +${m.reward} ✨`);
         _updateBar(id, m.max || 1, m.max || 1);
+
         const item = document.getElementById(`mission-${id}`);
         if (item) {
             item.classList.add('done', 'just-done');
-            item.querySelector('.mission-star').classList.add('done');
+            const starEl = item.querySelector('.mission-star');
+            if (starEl) starEl.classList.add('done');
             const btn = item.querySelector('.mission-btn');
             if (btn) { btn.textContent = '✓ Xong'; btn.disabled = true; }
         }
-        Sound.playSinewave(528);
+
+        if (typeof Sound !== 'undefined') Sound.playSinewave(528);
         _spawnDustParticles();
+
+        // FIX: Lưu state và cập nhật HUD sau khi hoàn thành
         Auth.saveState();
+        UI.updateHUD();
     }
 
-    function _isDone(id) { return !!STATE.dailyMissions[id + '_done']; }
+    function _isDone(id) {
+        if (!STATE.dailyMissions) return false;
+        return !!STATE.dailyMissions[id + '_done'];
+    }
 
     function _updateBar(id, value, max) {
         const item = document.getElementById(`mission-${id}`);
@@ -129,13 +155,18 @@ const Missions = (() => {
     function _initVoid() {
         const voidEl = document.getElementById('void');
         const timerEl = document.getElementById('void-timer');
-        const progress = document.getElementById('timer-progress');
+        const progressEl = document.getElementById('timer-progress');
         const countEl = document.getElementById('void-count');
-        const CIRC = 163; // 2πr ≈ 2*3.14*26
-        let startTime = null;
+        if (!voidEl || !timerEl || !progressEl || !countEl) return;
 
-        const startHold = () => {
-            if (_isDone('void_hold')) return;
+        const CIRC = 163;
+        let startTime = null;
+        let isHolding = false;
+
+        const startHold = (e) => {
+            e.preventDefault();
+            if (_isDone('void_hold') || isHolding) return;
+            isHolding = true;
             timerEl.classList.remove('hidden');
             startTime = Date.now();
             voidEl.style.boxShadow = '0 0 80px rgba(206,147,216,0.6)';
@@ -145,13 +176,15 @@ const Missions = (() => {
                 const remaining = Math.max(0, 10 - elapsed);
                 countEl.textContent = Math.ceil(remaining);
                 const offset = CIRC * (1 - elapsed / 10);
-                progress.style.strokeDashoffset = Math.max(0, offset);
+                progressEl.style.strokeDashoffset = Math.max(0, offset);
 
                 if (elapsed >= 10) {
                     clearInterval(voidHoldTimer);
+                    voidHoldTimer = null;
+                    isHolding = false;
                     timerEl.classList.add('hidden');
                     voidEl.style.animation = 'voidFlash 0.5s ease';
-                    setTimeout(() => voidEl.style.animation = '', 600);
+                    setTimeout(() => { voidEl.style.animation = ''; }, 600);
                     complete('void_hold');
                     _spawnAbsorbText();
                 }
@@ -159,21 +192,26 @@ const Missions = (() => {
         };
 
         const stopHold = () => {
+            if (!isHolding) return;
+            isHolding = false;
             if (voidHoldTimer) { clearInterval(voidHoldTimer); voidHoldTimer = null; }
             timerEl.classList.add('hidden');
-            progress.style.strokeDashoffset = CIRC;
+            progressEl.style.strokeDashoffset = CIRC;
             countEl.textContent = '10';
             voidEl.style.boxShadow = '';
         };
 
         voidEl.addEventListener('mousedown', startHold);
-        voidEl.addEventListener('touchstart', startHold, { passive: true });
+        voidEl.addEventListener('touchstart', startHold, { passive: false });
         voidEl.addEventListener('mouseup', stopHold);
         voidEl.addEventListener('mouseleave', stopHold);
         voidEl.addEventListener('touchend', stopHold);
+        voidEl.addEventListener('touchcancel', stopHold);
     }
 
     function _spawnAbsorbText() {
+        const container = document.getElementById('void-container');
+        if (!container) return;
         const texts = ['Buông bỏ...', 'Tan biến...', 'Hư vô...'];
         texts.forEach((t, i) => {
             setTimeout(() => {
@@ -182,7 +220,7 @@ const Missions = (() => {
                 el.textContent = t;
                 el.style.cssText = `left:${30 + Math.random() * 40}px; bottom:${80 + i * 20}px;
           --dx:${-20 + Math.random() * 40}px; --dy:${-40 - Math.random() * 30}px;`;
-                document.getElementById('void-container').appendChild(el);
+                container.appendChild(el);
                 setTimeout(() => el.remove(), 1200);
             }, i * 300);
         });
@@ -194,6 +232,8 @@ const Missions = (() => {
         const circle = document.getElementById('breathing-circle');
         const text = document.getElementById('breathing-text');
         const info = document.getElementById('breathing-info');
+        if (!overlay || !circle || !text || !info) return;
+
         overlay.classList.remove('hidden');
         breathingCycle = 0;
 
@@ -205,19 +245,16 @@ const Missions = (() => {
             }
             info.textContent = `Chu kỳ ${breathingCycle + 1}/3`;
 
-            // IN 4s
             text.textContent = 'Hít vào';
             circle.style.transition = 'transform 4s ease-in-out, box-shadow 4s ease-in-out';
             circle.style.transform = 'scale(1.5)';
             circle.style.boxShadow = '0 0 80px rgba(206,147,216,0.5)';
 
-            // HOLD 4s
             setTimeout(() => {
                 text.textContent = 'Giữ hơi';
                 circle.style.transition = 'transform 4s ease';
             }, 4000);
 
-            // OUT 8s
             setTimeout(() => {
                 text.textContent = 'Thở ra';
                 circle.style.transition = 'transform 8s ease-in-out, box-shadow 8s ease-in-out';
@@ -225,7 +262,6 @@ const Missions = (() => {
                 circle.style.boxShadow = '0 0 20px rgba(206,147,216,0.1)';
             }, 8000);
 
-            // Next cycle after 16s (4+4+8)
             setTimeout(() => {
                 breathingCycle++;
                 runCycle();
@@ -234,15 +270,17 @@ const Missions = (() => {
 
         runCycle();
 
-        document.getElementById('btn-skip-breathing').onclick = () => {
-            overlay.classList.add('hidden');
-            breathingCycle = 0;
-        };
+        const skipBtn = document.getElementById('btn-skip-breathing');
+        if (skipBtn) {
+            skipBtn.onclick = () => {
+                overlay.classList.add('hidden');
+                breathingCycle = 0;
+            };
+        }
     }
 
     /* ---------- INIT ASTRONAUT TIMER UI ---------- */
     function _initAstronautTimer() {
-        // Chỉ khởi tạo UI, không tự start - user phải bấm nút
         const timerEl = document.getElementById('astronaut-timer');
         if (timerEl) timerEl.classList.add('hidden');
     }
@@ -250,20 +288,25 @@ const Missions = (() => {
     /* ---------- PATIENT ASTRONAUT ---------- */
     function _startAstronaut() {
         if (_isDone('patient_astronaut')) return;
+
+        // FIX: Dừng interval cũ nếu có
+        if (astroInterval) { clearInterval(astroInterval); astroInterval = null; }
+
         const timerEl = document.getElementById('astronaut-timer');
         const barEl = document.getElementById('astro-bar');
         const timeEl = document.getElementById('astro-time');
+        if (!timerEl || !barEl || !timeEl) return;
+
         timerEl.classList.remove('hidden');
 
         const TOTAL_MS = CONFIG.PATIENT_DURATION;
         const start = Date.now();
-
-        // Detect tab switch
-        document.addEventListener('visibilitychange', _onTabSwitch);
+        astroElapsed = 0;
 
         function _onTabSwitch() {
             if (document.hidden) {
                 clearInterval(astroInterval);
+                astroInterval = null;
                 astroElapsed = 0;
                 barEl.style.width = '0%';
                 timeEl.textContent = '30:00';
@@ -272,6 +315,8 @@ const Missions = (() => {
                 UI.showToast('🚀 Phi hành gia rời Trạm... Thử lại từ đầu nhé!');
             }
         }
+
+        document.addEventListener('visibilitychange', _onTabSwitch);
 
         astroInterval = setInterval(() => {
             astroElapsed = Date.now() - start;
@@ -284,6 +329,7 @@ const Missions = (() => {
 
             if (astroElapsed >= TOTAL_MS) {
                 clearInterval(astroInterval);
+                astroInterval = null;
                 document.removeEventListener('visibilitychange', _onTabSwitch);
                 complete('patient_astronaut');
                 timerEl.classList.add('hidden');
@@ -294,9 +340,13 @@ const Missions = (() => {
     /* ---------- STREAK ---------- */
     function _checkStreakToday() {
         const today = _today();
+
+        // FIX: Đảm bảo STATE.streak là array
+        if (!Array.isArray(STATE.streak)) STATE.streak = [];
+
         if (!STATE.streak.includes(today)) {
             STATE.streak.push(today);
-            // Keep only last 7
+            // Giữ chỉ 7 ngày gần nhất
             if (STATE.streak.length > 7) STATE.streak = STATE.streak.slice(-7);
             _grantStreakReward();
             Auth.saveState();
@@ -320,8 +370,11 @@ const Missions = (() => {
         const el = document.getElementById('streak-mini');
         if (!el) return;
         const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-        const today = _today();
         const todayIdx = (new Date().getDay() + 6) % 7;
+
+        // FIX: Đảm bảo STATE.streak là array
+        if (!Array.isArray(STATE.streak)) STATE.streak = [];
+
         el.innerHTML = '';
         days.forEach((d, i) => {
             const dateStr = _getDateForDayIndex(i);
@@ -337,7 +390,7 @@ const Missions = (() => {
 
     function _getDateForDayIndex(i) {
         const now = new Date();
-        const day = now.getDay(); // 0=Sun
+        const day = now.getDay();
         const mondayOffset = (day === 0 ? -6 : 1 - day);
         const target = new Date(now);
         target.setDate(now.getDate() + mondayOffset + i);
@@ -372,6 +425,8 @@ const Missions = (() => {
         const charCount = document.getElementById('char-count');
         const btnSend = document.getElementById('btn-send');
 
+        if (!icon || !panel || !textarea || !charCount || !btnSend) return;
+
         icon.addEventListener('click', () => {
             panel.classList.toggle('hidden');
             if (!panel.classList.contains('hidden')) textarea.focus();
@@ -392,7 +447,7 @@ const Missions = (() => {
         btnSend.addEventListener('click', () => {
             const text = textarea.value.trim();
             if (!text) return;
-            Stars.sendSignal(text, STATE.activeStarType);
+            Stars.sendSignal(text, STATE.activeStarType || 'normal');
             textarea.value = '';
             charCount.textContent = '0';
             panel.classList.add('hidden');

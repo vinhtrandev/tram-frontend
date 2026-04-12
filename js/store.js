@@ -1,5 +1,5 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - store.js
+   TRẠM GỬI TÍN HIỆU - store.js (FIXED & HOÀN CHỈNH)
    Star Store: three tabs, unlock items
    ================================================ */
 
@@ -26,6 +26,10 @@ const Store = (() => {
     function _renderContent() {
         const el = document.getElementById('store-content');
         if (!el) return;
+
+        // FIX: Đảm bảo STATE.unlocked tồn tại
+        if (!STATE.unlocked) STATE.unlocked = {};
+
         const items = CONFIG.STORE[currentTab] || [];
         el.innerHTML = '';
 
@@ -37,9 +41,12 @@ const Store = (() => {
             el.appendChild(cc);
         }
 
+        // FIX: Đảm bảo STATE.points là số hợp lệ
+        const currentPoints = parseInt(STATE.points) || 0;
+
         items.forEach(item => {
             const isUnlocked = !!STATE.unlocked[item.id];
-            const canAfford = STATE.points >= item.price;
+            const canAfford = currentPoints >= item.price;
             const div = document.createElement('div');
             div.className = 'store-item';
             div.id = `store-item-${item.id}`;
@@ -56,27 +63,60 @@ const Store = (() => {
           ${isUnlocked ? '✓ Đã mở khóa' : 'Mở khóa bằng ✨'}
         </button>
       `;
+
             if (!isUnlocked && !canAfford) {
                 const btn = div.querySelector('.btn-unlock');
                 btn.style.opacity = '0.4';
                 btn.title = 'Chưa đủ ✨ Tinh Tú';
+                btn.disabled = true; // FIX: Disable hẳn nếu không đủ điểm
             }
+
             el.appendChild(div);
         });
 
+        // FIX: Chỉ bind event cho nút chưa disabled
         el.querySelectorAll('.btn-unlock:not([disabled])').forEach(btn => {
-            btn.addEventListener('click', () => _unlock(btn.dataset.id));
+            btn.addEventListener('click', () => _unlock(btn.dataset.id, parseInt(btn.dataset.price)));
         });
     }
 
-    async function _unlock(itemId) {
-        // Offline / local mode fallback
-        if (!STATE.user?.token || STATE.user.token === 'local') {
-            UI.showToast('❌ Cần kết nối server để mở khóa!');
+    // FIX: Thêm param price để kiểm tra client-side trước khi gọi API
+    async function _unlock(itemId, price) {
+        // FIX: Kiểm tra điểm client-side trước
+        const currentPoints = parseInt(STATE.points) || 0;
+        if (currentPoints < price) {
+            UI.showToast('❌ Không đủ ✨ Tinh Tú!');
             return;
         }
 
+        // Offline / local mode fallback
+        if (!STATE.user?.token || STATE.user.token === 'local') {
+            // FIX: Cho phép mở khóa offline bằng cách trừ điểm local
+            STATE.points = currentPoints - price;
+            if (!STATE.unlocked) STATE.unlocked = {};
+            STATE.unlocked[itemId] = true;
+            Auth.saveState();
+
+            if (itemId === 'plant_tree') {
+                const t = parseInt(localStorage.getItem('tram_trees') || '0') + 1;
+                localStorage.setItem('tram_trees', t);
+            }
+
+            const itemEl = document.getElementById(`store-item-${itemId}`);
+            if (itemEl) itemEl.classList.add('just-unlocked');
+
+            UI.showToast('🎉 Mở khóa thành công!');
+            UI.updateHUD();
+            _renderContent();
+            return;
+        }
+
+        // Online mode
         try {
+            // FIX: Disable nút trong khi đang xử lý để tránh double click
+            const btn = document.querySelector(`#store-item-${itemId} .btn-unlock`);
+            if (btn) { btn.disabled = true; btn.textContent = 'Đang xử lý...'; }
+
             const res = await fetch(`${CONFIG.API_BASE}/auth/unlock`, {
                 method: 'POST',
                 headers: {
@@ -87,20 +127,28 @@ const Store = (() => {
             });
 
             if (!res.ok) {
-                const err = await res.json();
+                const err = await res.json().catch(() => ({ message: 'Lỗi không xác định' }));
                 UI.showToast(`❌ ${err.message}`);
+                // FIX: Re-enable nút nếu thất bại
+                if (btn) { btn.disabled = false; btn.textContent = 'Mở khóa bằng ✨'; }
                 return;
             }
 
             const data = await res.json();
 
-            // ✅ Cập nhật state từ server
-            STATE.points = data.points;
-            const unlockedArr = data.unlockedItems
-                ? data.unlockedItems.split(',').filter(Boolean)
-                : [];
-            STATE.unlocked = {};
-            unlockedArr.forEach(id => STATE.unlocked[id] = true);
+            // FIX: Cập nhật STATE từ server response
+            STATE.points = parseInt(data.points) || 0;
+
+            // FIX: Xử lý unlockedItems dù là array hay string
+            if (Array.isArray(data.unlockedItems)) {
+                STATE.unlocked = {};
+                data.unlockedItems.forEach(id => { STATE.unlocked[id] = true; });
+            } else if (typeof data.unlockedItems === 'string') {
+                const unlockedArr = data.unlockedItems.split(',').filter(Boolean);
+                STATE.unlocked = {};
+                unlockedArr.forEach(id => { STATE.unlocked[id] = true; });
+            }
+
             Auth.saveState();
 
             if (itemId === 'plant_tree') {
@@ -115,8 +163,12 @@ const Store = (() => {
             UI.updateHUD();
             _renderContent();
 
-        } catch {
+        } catch (err) {
+            console.error('unlock error:', err);
             UI.showToast('❌ Lỗi kết nối, thử lại sau!');
+            // FIX: Re-enable nút nếu lỗi mạng
+            const btn = document.querySelector(`#store-item-${itemId} .btn-unlock`);
+            if (btn) { btn.disabled = false; btn.textContent = 'Mở khóa bằng ✨'; }
         }
     }
 
