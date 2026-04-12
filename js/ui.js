@@ -39,7 +39,6 @@ const UI = (() => {
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 1300);
 
-        // Ring effect
         const ring = document.createElement('div');
         ring.className = 'points-ring';
         ring.style.cssText = `left:${rect.left - 5}px; top:${rect.top - 5}px;`;
@@ -64,12 +63,93 @@ const UI = (() => {
         typewriter(el, msg, 60);
     }
 
-    /* ---------- HEALING QUOTES ---------- */
+    /* ---------- HEALING QUOTES (định kỳ) ---------- */
     function startRandomQuotes() {
         setInterval(() => {
             const q = CONFIG.QUOTES[Math.floor(Math.random() * CONFIG.QUOTES.length)];
             showToast(`💫 ${q}`, 5000);
-        }, 8 * 60 * 1000); // every 8 minutes
+        }, 8 * 60 * 1000);
+    }
+
+    function showHealingQuote() {
+        const q = CONFIG.QUOTES[Math.floor(Math.random() * CONFIG.QUOTES.length)];
+        showToast(`💜 ${q}`, 6000);
+    }
+
+    /* ---------- SEND BLESSINGS ---------- */
+    const BLESSINGS = [
+        '🌟 Tín hiệu của bạn đã bay vào vũ trụ!',
+        '💫 Vũ trụ đã nhận được tâm tư của bạn~',
+        '🚀 Lời bạn đã vượt qua dải Ngân Hà rồi đó!',
+        '✨ Một ngôi sao mới vừa được thắp lên!',
+        '🌙 Tín hiệu đang lướt qua những vì sao đêm nay...',
+        '🌌 Bầu trời ghi nhớ từng lời bạn gửi đi~',
+        '💜 Mong điều bạn gửi sẽ trở thành ánh sáng!',
+        '🛸 Phi thuyền đã nhận tín hiệu. Chúc bạn bình yên!',
+        '⭐ Cảm xúc của bạn xứng đáng được lắng nghe~',
+        '🌠 Sao băng mang lời bạn đến tận chân trời!'
+    ];
+
+    function showSendBlessing() {
+        const msg = BLESSINGS[Math.floor(Math.random() * BLESSINGS.length)];
+        showToast(msg, 4000);
+    }
+
+    /* ---------- HEAL PANEL ---------- */
+    let _healIndex = Math.floor(Math.random() * (CONFIG?.QUOTES?.length || 1));
+
+    function _renderHealPanel() {
+        const panel = document.getElementById('heal-panel');
+        if (!panel) return;
+
+        panel.innerHTML = `
+            <div class="panel-header">
+                <h3>💜 Chữa Lành</h3>
+                <button class="panel-close" id="close-heal">✕</button>
+            </div>
+            <div class="heal-body">
+                <div class="heal-quote-card">
+                    <span class="heal-quote-icon">🌸</span>
+                    <p class="heal-quote-text" id="heal-quote-text"></p>
+                </div>
+                <button class="btn-new-quote" id="btn-new-quote">
+                    <span class="btn-new-quote-icon">✨</span>
+                    <span>Câu khác</span>
+                </button>
+            </div>
+        `;
+
+        _showHealQuote(false);
+
+        document.getElementById('close-heal')?.addEventListener('click', () => {
+            panel.classList.add('hidden');
+        });
+
+        document.getElementById('btn-new-quote')?.addEventListener('click', () => {
+            // Chọn câu khác, không trùng câu hiện tại
+            let next;
+            do { next = Math.floor(Math.random() * CONFIG.QUOTES.length); }
+            while (next === _healIndex && CONFIG.QUOTES.length > 1);
+            _healIndex = next;
+            _showHealQuote(true);
+        });
+    }
+
+    function _showHealQuote(animate) {
+        const el = document.getElementById('heal-quote-text');
+        if (!el) return;
+        if (animate) {
+            el.style.opacity = '0';
+            el.style.transform = 'translateY(8px)';
+            setTimeout(() => {
+                el.textContent = CONFIG.QUOTES[_healIndex];
+                el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+            }, 150);
+        } else {
+            el.textContent = CONFIG.QUOTES[_healIndex];
+        }
     }
 
     /* ---------- PANELS ---------- */
@@ -78,12 +158,14 @@ const UI = (() => {
         const closeMissions = document.getElementById('close-missions');
         const btnStore = document.getElementById('btn-store');
         const closeStore = document.getElementById('close-store');
+        const btnHeal = document.getElementById('btn-heal');
         const btnLogout = document.getElementById('btn-logout');
 
         if (btnMissions) {
             btnMissions.addEventListener('click', () => {
                 togglePanel('missions-panel');
                 document.getElementById('store-panel')?.classList.add('hidden');
+                document.getElementById('heal-panel')?.classList.add('hidden');
             });
         }
 
@@ -97,6 +179,7 @@ const UI = (() => {
             btnStore.addEventListener('click', () => {
                 togglePanel('store-panel');
                 document.getElementById('missions-panel')?.classList.add('hidden');
+                document.getElementById('heal-panel')?.classList.add('hidden');
                 Store?.init?.();
             });
         }
@@ -104,6 +187,19 @@ const UI = (() => {
         if (closeStore) {
             closeStore.addEventListener('click', () => {
                 document.getElementById('store-panel')?.classList.add('hidden');
+            });
+        }
+
+        // ✅ Handler Chữa Lành
+        if (btnHeal) {
+            btnHeal.addEventListener('click', () => {
+                document.getElementById('missions-panel')?.classList.add('hidden');
+                document.getElementById('store-panel')?.classList.add('hidden');
+                const panel = document.getElementById('heal-panel');
+                if (panel) {
+                    panel.classList.toggle('hidden');
+                    if (!panel.classList.contains('hidden')) _renderHealPanel();
+                }
             });
         }
 
@@ -139,5 +235,16 @@ const UI = (() => {
         document.getElementById('user-points').textContent = STATE.points;
     }
 
-    return { showToast, addPoints, typewriter, initLandingText, startRandomQuotes, initPanels, showWelcome, updateHUD };
+    return {
+        showToast,
+        addPoints,
+        typewriter,
+        initLandingText,
+        startRandomQuotes,
+        initPanels,
+        showWelcome,
+        updateHUD,
+        showSendBlessing,
+        showHealingQuote
+    };
 })();

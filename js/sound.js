@@ -100,6 +100,74 @@ const Sound = (() => {
         currentNode = null; gainNode = null;
     }
 
+    /* ---------- BELL - tiếng chuông crystal bowl khi gửi tín hiệu ---------- */
+    function playBell() {
+        try {
+            const c = _getCtx();
+            const now = c.currentTime;
+
+            // Reverb ngắn để âm ngân trong không gian
+            const rvBuf = c.createBuffer(2, c.sampleRate * 2, c.sampleRate);
+            [0, 1].forEach(ch => {
+                const d = rvBuf.getChannelData(ch);
+                for (let i = 0; i < d.length; i++)
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.8);
+            });
+            const rev = c.createConvolver();
+            rev.buffer = rvBuf;
+            const revGain = c.createGain();
+            revGain.gain.value = 0.22;
+            rev.connect(revGain);
+            revGain.connect(c.destination);
+
+            // 3 lớp sine chồng nhau → âm crystal bowl ấm
+            const layers = [
+                { freq: 528, gain: 0.18, decay: 2.6 },
+                { freq: 1056, gain: 0.09, decay: 1.8 },
+                { freq: 1584, gain: 0.04, decay: 1.1 },
+            ];
+            layers.forEach(({ freq, gain, decay }, i) => {
+                const osc = c.createOscillator();
+                const env = c.createGain();
+                const pan = c.createStereoPanner();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.004, now + 0.1);
+
+                env.gain.setValueAtTime(0, now);
+                env.gain.linearRampToValueAtTime(gain, now + 0.012);
+                env.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+
+                pan.pan.value = (i - 1) * 0.12;
+
+                osc.connect(env);
+                env.connect(pan);
+                pan.connect(c.destination);
+                pan.connect(rev);
+
+                osc.start(now);
+                osc.stop(now + decay + 0.1);
+            });
+
+            // Sub-bass nhẹ → độ sâu ấm
+            const sub = c.createOscillator();
+            const subG = c.createGain();
+            sub.type = 'sine';
+            sub.frequency.setValueAtTime(132, now);
+            subG.gain.setValueAtTime(0, now);
+            subG.gain.linearRampToValueAtTime(0.05, now + 0.02);
+            subG.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
+            sub.connect(subG);
+            subG.connect(c.destination);
+            sub.start(now);
+            sub.stop(now + 0.8);
+
+        } catch (e) {
+            console.warn('Sound.playBell error:', e);
+        }
+    }
+
     /* ---------- SINEWAVE (star click / reward) ---------- */
     function playSinewave(freq = 528) {
         try {
@@ -141,7 +209,7 @@ const Sound = (() => {
     function _isUnlocked(type) {
         if (type === 'off') return true;
         const itemId = SOUND_ITEM_MAP[type];
-        if (!itemId) return true; // unknown type, allow
+        if (!itemId) return true;
         return !!STATE.unlocked[itemId];
     }
 
@@ -151,7 +219,6 @@ const Sound = (() => {
             btn.addEventListener('click', () => {
                 const type = btn.dataset.sound;
 
-                // ✅ Check unlock
                 if (!_isUnlocked(type)) {
                     UI.showToast('🔒 Mở khóa âm thanh này trong Star Store!');
                     return;
@@ -164,11 +231,9 @@ const Sound = (() => {
             });
         });
 
-        // ✅ Chỉ auto-play nếu đã unlock
         if (_isUnlocked(STATE.currentSound)) {
             playAmbient(STATE.currentSound);
         } else {
-            // Default về 'off' nếu chưa unlock
             STATE.currentSound = 'off';
             document.querySelectorAll('.sound-btn').forEach(b => {
                 if (b.dataset.sound === 'off') b.classList.add('active');
@@ -177,5 +242,5 @@ const Sound = (() => {
         }
     }
 
-    return { playAmbient, stop, playSinewave, initButtons };
+    return { playAmbient, stop, playSinewave, playBell, initButtons };
 })();

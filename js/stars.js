@@ -11,10 +11,42 @@ const Stars = (() => {
     let shootingActive = false;
     let shootingTimer, meteorTimer;
 
+    const METEOR_DURATION = 8000;
+
     /* ---- NEGATIVE KEYWORD CHECK ---- */
     function _isNegative(text) {
         const lower = text.toLowerCase();
         return CONFIG.NEGATIVE_KEYWORDS.some(k => lower.includes(k));
+    }
+
+    /* ---- SYNC ĐIỂM TỪ SERVER ---- */
+    async function _syncPointsFromServer() {
+        if (!STATE.user?.token || STATE.user.token === 'local') return;
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/auth/me`, {
+                headers: { 'Authorization': `Bearer ${STATE.user.token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            STATE.points = data.points;
+            STATE.user.points = data.points;
+            localStorage.setItem('tram_points', STATE.points);
+        } catch { }
+    }
+
+    /* ---- GỬI ĐIỂM LÊN SERVER ---- */
+    async function _pushPointsToServer(amount) {
+        if (!STATE.user?.token || STATE.user.token === 'local') return;
+        try {
+            await fetch(`${CONFIG.API_BASE}/auth/points`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${STATE.user.token}`
+                },
+                body: JSON.stringify({ amount })
+            });
+        } catch { }
     }
 
     /* ---- CREATE DOM STAR ---- */
@@ -80,7 +112,6 @@ const Stars = (() => {
             };
         });
 
-        // Mission: read_stars
         STATE.starsRead = (parseInt(STATE.starsRead) || 0) + 1;
         Missions.progress('read_stars', STATE.starsRead);
     }
@@ -98,7 +129,9 @@ const Stars = (() => {
             });
             el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
             setTimeout(() => { el.style.boxShadow = ''; }, 1200);
-        } catch { /* offline graceful */ }
+            await _syncPointsFromServer();
+            UI.updateHUD();
+        } catch { }
     }
 
     /* ---- LOAD STARS FROM SERVER ---- */
@@ -107,27 +140,21 @@ const Stars = (() => {
             const res = await fetch(`${CONFIG.API_BASE}/stars`, {
                 headers: { 'Authorization': `Bearer ${STATE.user?.token}` }
             });
-
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
             const list = await res.json();
 
-            // FIX: Xóa sao cũ trước khi render lại tránh duplicate
             domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
             domStars = [];
 
             list.forEach(s => {
-                // FIX: Dùng == null thay vì !s.x để tránh lỗi khi x = 0
-                if (s.x == null || s.x === undefined) s.x = 5 + Math.random() * 88;
-                if (s.y == null || s.y === undefined) s.y = 5 + Math.random() * 70;
+                if (s.x == null) s.x = 5 + Math.random() * 88;
+                if (s.y == null) s.y = 5 + Math.random() * 70;
                 if (!s.size) s.size = 3 + Math.random() * 5;
                 if (!s.opacity) s.opacity = 0.5 + Math.random() * 0.5;
-                // FIX: Đảm bảo type hợp lệ
                 if (!CONFIG.STAR_TYPES[s.type]) s.type = 'normal';
                 const el = _createDomStar(s);
                 domStars.push({ el, data: s });
             });
-
         } catch (err) {
             console.warn('loadStars error, dùng demo stars:', err);
             _addDemoStars();
@@ -135,10 +162,8 @@ const Stars = (() => {
     }
 
     function _addDemoStars() {
-        // FIX: Xóa sao cũ trước khi thêm demo
         domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
         domStars = [];
-
         const demos = [
             { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'normal', isNegative: true },
             { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'bright', isNegative: false },
@@ -151,7 +176,6 @@ const Stars = (() => {
             { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'bright', isNegative: false },
             { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'normal', isNegative: false },
         ];
-
         demos.forEach(d => {
             const x = 5 + Math.random() * 88;
             const y = 5 + Math.random() * 65;
@@ -162,13 +186,22 @@ const Stars = (() => {
         });
     }
 
-    /* ---- SEND SIGNAL ---- */
+    /* ================================================================
+       SEND SIGNAL
+       ① Tiếng chuông crystal bowl ngay khi nhấn gửi
+       ② Câu an ủi pill top-center
+       ③ Particle bay lên + tạo ngôi sao
+       ================================================================ */
     async function sendSignal(text, type) {
         if (!text.trim()) return;
 
-        // FIX: Validate type
-        const validType = CONFIG.STAR_TYPES[type] ? type : 'normal';
+        // ① Tiếng chuông - phát ngay lập tức
+        if (typeof Sound !== 'undefined') Sound.playBell();
 
+        // ② Câu an ủi pill top-center
+        if (typeof HealToast !== 'undefined') HealToast.show();
+
+        const validType = CONFIG.STAR_TYPES[type] ? type : 'normal';
         const x = 10 + Math.random() * 78;
         const y = 5 + Math.random() * 60;
         const sizeRange = CONFIG.STAR_TYPES[validType].size;
@@ -176,21 +209,17 @@ const Stars = (() => {
         const hasTrail = STATE.unlocked && !!STATE.unlocked['trail_star'];
         const hasHalo = STATE.unlocked && !!STATE.unlocked['halo_star'];
 
+        // ③ Particle bay lên rồi đặt sao
         _animateSignalFly(x, y, async () => {
             const data = {
                 id: null, text, type: validType, x, y, size: starSize, opacity: 0.85,
                 isNegative: _isNegative(text), tailEffect: hasTrail, haloEffect: hasHalo
             };
-
-            // FIX: Await post và gắn id vào data trước khi push
             const id = await _postStar(text, validType, x, y);
             if (id) data.id = id;
-
             const el = _createDomStar(data);
             domStars.push({ el, data });
-
-            UI.addPoints(CONFIG.POINTS.SEND_SIGNAL);
-            UI.showToast('✨ Tín hiệu của bạn đã được vũ trụ tiếp nhận. Bạn không cô đơn.');
+            await _syncPointsFromServer();
             UI.updateHUD();
         });
     }
@@ -198,20 +227,14 @@ const Stars = (() => {
     function _animateSignalFly(targetX, targetY, onDone) {
         const panel = document.getElementById('input-panel');
         if (!panel) { onDone && onDone(); return; }
-
         const rect = panel.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
-
         const particle = document.createElement('div');
         particle.className = 'signal-particle';
         particle.style.cssText = `left:${cx - 4}px; top:${cy - 4}px;`;
         document.body.appendChild(particle);
-
-        setTimeout(() => {
-            particle.remove();
-            onDone && onDone();
-        }, 1500);
+        setTimeout(() => { particle.remove(); onDone && onDone(); }, 1500);
     }
 
     async function _postStar(text, type, x, y) {
@@ -222,10 +245,7 @@ const Stars = (() => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${STATE.user?.token}`
                 },
-                body: JSON.stringify({
-                    text, type, x, y,
-                    nickname: STATE.user?.nickname || 'Ẩn danh'
-                })
+                body: JSON.stringify({ text, type, x, y, nickname: STATE.user?.nickname || 'Ẩn danh' })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -236,56 +256,130 @@ const Stars = (() => {
         }
     }
 
-    /* ---- SHOOTING STAR EVENT ---- */
+    /* ================================================================
+       SHOOTING STAR - cố định 60 giây / lần
+       ================================================================ */
+    function _isShootingStarDone() {
+        return !!(STATE.dailyMissions && STATE.dailyMissions['shooting_star_done']);
+    }
+
     function startShootingStarCycle() {
-        // Lần đầu sau 1 phút
+        if (_isShootingStarDone()) return;
         shootingTimer = setTimeout(() => {
             _launchShootingStar();
-            // Sau đó mỗi 15 phút
-            setInterval(_launchShootingStar, CONFIG.SHOOTING_STAR_INTERVAL);
-        }, 60000);
+            shootingTimer = setInterval(() => {
+                if (!_isShootingStarDone()) _launchShootingStar();
+            }, 60000);
+        }, 5000);
     }
 
     function _launchShootingStar() {
-        if (shootingActive) return;
+        if (shootingActive || _isShootingStarDone()) return;
         shootingActive = true;
 
-        const meteor = document.createElement('div');
-        meteor.className = 'meteor-line clickable';
-        const startX = 20 + Math.random() * 60;
-        meteor.style.cssText = `
-      left:${startX}vw; top:${10 + Math.random() * 30}vh;
-      transform:rotate(-45deg);
-    `;
         const screen = document.getElementById('main-screen');
         if (!screen) { shootingActive = false; return; }
-        screen.appendChild(meteor);
+
+        const startTop = 5 + Math.random() * 20;
+        const startLeft = 65 + Math.random() * 25;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'shooting-star-wrapper';
+        wrapper.style.cssText = `
+            position: fixed;
+            top: ${startTop}vh;
+            left: ${startLeft}vw;
+            width: 0; height: 0;
+            pointer-events: none;
+            z-index: 500;
+            animation: shootingMeteor ${METEOR_DURATION}ms cubic-bezier(0.18, 0.05, 0.42, 1) forwards;
+        `;
+
+        const tail = document.createElement('div');
+        tail.className = 'shooting-star-tail';
+
+        const glow = document.createElement('div');
+        glow.className = 'shooting-star-glow';
+
+        const head = document.createElement('div');
+        head.className = 'shooting-star-head';
+        head.style.pointerEvents = 'all';
+        head.style.cursor = 'pointer';
+
+        wrapper.appendChild(tail);
+        wrapper.appendChild(glow);
+        wrapper.appendChild(head);
+        screen.appendChild(wrapper);
 
         const hint = document.getElementById('shooting-hint');
         if (hint) hint.classList.remove('hidden');
 
         let caught = false;
 
-        meteor.addEventListener('click', () => {
+        const catchMeteor = async (e) => {
+            e.stopPropagation();
             if (caught) return;
             caught = true;
             shootingActive = false;
-            meteor.remove();
+
+            const computed = window.getComputedStyle(wrapper);
+            const matrix = new DOMMatrix(computed.transform);
+            wrapper.style.animation = 'none';
+            wrapper.style.transform = `translate(${matrix.m41}px, ${matrix.m42}px) rotate(-35deg)`;
+
             if (hint) hint.classList.add('hidden');
+            _spawnCatchEffect(wrapper);
+            setTimeout(() => wrapper.remove(), 600);
+
             UI.addPoints(CONFIG.POINTS.SHOOTING_STAR);
+            await _pushPointsToServer(CONFIG.POINTS.SHOOTING_STAR);
             Missions.complete('shooting_star');
             UI.showToast(`🌠 Bạn đã bắt được sao băng! +${CONFIG.POINTS.SHOOTING_STAR} ✨`);
             if (typeof Sound !== 'undefined') Sound.playSinewave(880);
             UI.updateHUD();
-        });
+        };
+
+        head.addEventListener('click', catchMeteor);
+        head.addEventListener('touchstart', catchMeteor, { passive: false });
 
         setTimeout(() => {
             if (!caught) {
-                if (meteor.parentNode) meteor.remove();
+                if (wrapper.parentNode) wrapper.remove();
                 if (hint) hint.classList.add('hidden');
                 shootingActive = false;
             }
-        }, 3000);
+        }, METEOR_DURATION + 200);
+    }
+
+    function _spawnCatchEffect(wrapper) {
+        const rect = wrapper.getBoundingClientRect();
+        const cx = rect.left;
+        const cy = rect.top;
+
+        const ring = document.createElement('div');
+        ring.className = 'points-ring';
+        ring.style.cssText = `left:${cx}px; top:${cy}px; transform: translate(-50%,-50%);`;
+        document.body.appendChild(ring);
+        setTimeout(() => ring.remove(), 800);
+
+        for (let i = 0; i < 20; i++) {
+            setTimeout(() => {
+                const p = document.createElement('div');
+                p.className = 'dust-particle';
+                const size = 2 + Math.random() * 5;
+                const colors = ['#fff', 'var(--accent-gold)', '#c8dcff', '#e8d5ff'];
+                p.style.cssText = `
+                    width:${size}px; height:${size}px;
+                    left:${cx + (-40 + Math.random() * 80)}px;
+                    top:${cy + (-20 + Math.random() * 40)}px;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    --dx:${-120 + Math.random() * 240}px;
+                    --dy:${-140 - Math.random() * 100}px;
+                `;
+                document.body.appendChild(p);
+                setTimeout(() => p.remove(), 1400);
+            }, i * 40);
+        }
     }
 
     /* ---- METEOR RAIN ---- */
@@ -293,10 +387,12 @@ const Stars = (() => {
         meteorTimer = setInterval(_meteorRain, CONFIG.METEOR_RAIN_INTERVAL + 60000);
     }
 
-    function _meteorRain() {
+    async function _meteorRain() {
         UI.showToast('🌠 Mưa sao băng! Bạn nhận được +30 ✨ may mắn!');
         UI.addPoints(30);
+        await _pushPointsToServer(30);
         UI.updateHUD();
+
         const screen = document.getElementById('main-screen');
         if (!screen) return;
         for (let i = 0; i < 12; i++) {
@@ -314,13 +410,11 @@ const Stars = (() => {
     function initPopupClose() {
         const closeBtn = document.getElementById('popup-close');
         const canvas = document.getElementById('star-canvas');
-
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
                 document.getElementById('star-popup').classList.add('hidden');
             });
         }
-
         if (canvas) {
             canvas.addEventListener('click', e => {
                 if (!e.target.closest('.star-popup') && !e.target.classList.contains('star-dot')) {

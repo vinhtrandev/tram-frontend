@@ -1,6 +1,10 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - missions.js (FIXED & HOÀN CHỈNH)
-   Mission system: daily missions + weekly streak
+   TRẠM GỬI TÍN HIỆU - missions.js (FIXED FULL)
+   FIX CHÍNH: complete() giờ gọi API /auth/points
+   để lưu điểm vào DB thay vì chỉ lưu localStorage
+   + Điểm danh thủ công: bấm vào ô ngày hôm nay
+   + FIX streak tự tích: chỉ giữ các ngày hợp lệ
+     trong tuần hiện tại, xóa ngày tương lai
    ================================================ */
 
 const Missions = (() => {
@@ -13,20 +17,66 @@ const Missions = (() => {
     /* ---------- INIT ---------- */
     function init() {
         _resetDailyIfNeeded();
+        _sanitizeStreak();      // ← FIX: làm sạch streak mỗi lần load
         _renderMissions();
         _renderStreak();
         _initVoid();
         _initInput();
         _initAstronautTimer();
-        _checkStreakToday();
     }
 
     /* ---------- DAILY RESET ---------- */
     function _resetDailyIfNeeded() {
         const today = _today();
-        // Đảm bảo STATE.dailyMissions tồn tại
         if (!STATE.dailyMissions || STATE.dailyMissions._date !== today) {
             STATE.dailyMissions = { _date: today };
+            Auth.saveState();
+        }
+    }
+
+    /*
+     * FIX: _sanitizeStreak
+     * Loại bỏ khỏi STATE.streak bất kỳ ngày nào:
+     *   - Ở tương lai (> hôm nay)
+     *   - Nằm ngoài tuần hiện tại (T2 → CN tuần này)
+     * → Đảm bảo streak không bao giờ tự có ngày
+     *   mà user chưa bấm điểm danh.
+     */
+    function _sanitizeStreak() {
+        if (!Array.isArray(STATE.streak)) {
+            STATE.streak = [];
+            Auth.saveState();
+            return;
+        }
+
+        const today = _today();
+
+        // Tính T2 và CN của tuần hiện tại
+        const now = new Date();
+        const dow = now.getDay(); // 0=CN, 1=T2 ... 6=T7
+        const mondayOffset = dow === 0 ? -6 : 1 - dow;
+
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + mondayOffset);
+        monday.setHours(0, 0, 0, 0);
+
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        const before = STATE.streak.length;
+
+        STATE.streak = STATE.streak.filter(dateStr => {
+            if (!dateStr || typeof dateStr !== 'string') return false;
+            // Không được ở tương lai
+            if (dateStr > today) return false;
+            // Phải nằm trong tuần hiện tại
+            const d = new Date(dateStr);
+            return d >= monday && d <= sunday;
+        });
+
+        // Chỉ save nếu có thay đổi
+        if (STATE.streak.length !== before) {
             Auth.saveState();
         }
     }
@@ -92,8 +142,6 @@ const Missions = (() => {
     function progress(id, value) {
         const m = CONFIG.MISSIONS.find(m => m.id === id);
         if (!m || _isDone(id)) return;
-
-        // Đảm bảo STATE.dailyMissions tồn tại
         if (!STATE.dailyMissions) STATE.dailyMissions = { _date: _today() };
 
         STATE.dailyMissions[id] = value;
@@ -105,21 +153,23 @@ const Missions = (() => {
         Auth.saveState();
     }
 
-    function complete(id) {
+    async function complete(id) {
         if (_isDone(id)) return;
         const m = CONFIG.MISSIONS.find(m => m.id === id);
         if (!m) return;
 
-        // Đảm bảo STATE.dailyMissions tồn tại
         if (!STATE.dailyMissions) STATE.dailyMissions = { _date: _today() };
 
         STATE.dailyMissions[id + '_done'] = true;
         STATE.dailyMissions[id] = m.max || 1;
 
-        // FIX: Đảm bảo points là số hợp lệ trước khi cộng
-        UI.addPoints(m.reward);
+        STATE.points = (parseInt(STATE.points) || 0) + m.reward;
+        Auth.saveState();
 
+        UI.updateHUD();
         UI.showToast(`✅ ${m.name} hoàn thành! +${m.reward} ✨`);
+        setTimeout(() => UI.showHealingQuote(), 1200);
+
         _updateBar(id, m.max || 1, m.max || 1);
 
         const item = document.getElementById(`mission-${id}`);
@@ -134,9 +184,29 @@ const Missions = (() => {
         if (typeof Sound !== 'undefined') Sound.playSinewave(528);
         _spawnDustParticles();
 
-        // FIX: Lưu state và cập nhật HUD sau khi hoàn thành
-        Auth.saveState();
-        UI.updateHUD();
+        await _syncPointsToServer(m.reward);
+    }
+
+    async function _syncPointsToServer(amount) {
+        if (!STATE.user?.token || STATE.user.token === 'local') return;
+        try {
+            const res = await fetch(`${CONFIG.API_BASE}/auth/points`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${STATE.user.token}`
+                },
+                body: JSON.stringify({ amount })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                STATE.points = parseInt(data.points) || STATE.points;
+                Auth.saveState();
+                UI.updateHUD();
+            }
+        } catch {
+            console.warn('Offline: điểm đã lưu local, sẽ sync khi có mạng.');
+        }
     }
 
     function _isDone(id) {
@@ -244,7 +314,6 @@ const Missions = (() => {
                 return;
             }
             info.textContent = `Chu kỳ ${breathingCycle + 1}/3`;
-
             text.textContent = 'Hít vào';
             circle.style.transition = 'transform 4s ease-in-out, box-shadow 4s ease-in-out';
             circle.style.transform = 'scale(1.5)';
@@ -279,17 +348,14 @@ const Missions = (() => {
         }
     }
 
-    /* ---------- INIT ASTRONAUT TIMER UI ---------- */
+    /* ---------- ASTRONAUT TIMER ---------- */
     function _initAstronautTimer() {
         const timerEl = document.getElementById('astronaut-timer');
         if (timerEl) timerEl.classList.add('hidden');
     }
 
-    /* ---------- PATIENT ASTRONAUT ---------- */
     function _startAstronaut() {
         if (_isDone('patient_astronaut')) return;
-
-        // FIX: Dừng interval cũ nếu có
         if (astroInterval) { clearInterval(astroInterval); astroInterval = null; }
 
         const timerEl = document.getElementById('astronaut-timer');
@@ -298,7 +364,6 @@ const Missions = (() => {
         if (!timerEl || !barEl || !timeEl) return;
 
         timerEl.classList.remove('hidden');
-
         const TOTAL_MS = CONFIG.PATIENT_DURATION;
         const start = Date.now();
         astroElapsed = 0;
@@ -337,53 +402,131 @@ const Missions = (() => {
         }, 1000);
     }
 
-    /* ---------- STREAK ---------- */
-    function _checkStreakToday() {
-        const today = _today();
+    /* ================================================
+       STREAK - Điểm danh thủ công
+       3 trạng thái rõ ràng:
+       1. Ngày thường / chưa tới  → xám mờ
+       2. Hôm nay CHƯA điểm danh → vàng, to hơn, "Tap!"
+       3. Hôm nay ĐÃ điểm danh   → tím sáng, dấu ✓
+       ================================================ */
 
-        // FIX: Đảm bảo STATE.streak là array
-        if (!Array.isArray(STATE.streak)) STATE.streak = [];
-
-        if (!STATE.streak.includes(today)) {
-            STATE.streak.push(today);
-            // Giữ chỉ 7 ngày gần nhất
-            if (STATE.streak.length > 7) STATE.streak = STATE.streak.slice(-7);
-            _grantStreakReward();
-            Auth.saveState();
-        }
-        _renderStreak();
+    function _getStreakReward(len) {
+        if (len >= 7) return 200;
+        if (len >= 4) return 50;
+        if (len >= 2) return 20;
+        return 10;
     }
 
-    function _grantStreakReward() {
+    function _doCheckIn() {
+        const today = _today();
+        if (!Array.isArray(STATE.streak)) STATE.streak = [];
+        if (STATE.streak.includes(today)) return; // đã điểm danh rồi
+
+        STATE.streak.push(today);
+        if (STATE.streak.length > 7) STATE.streak = STATE.streak.slice(-7);
+
         const len = STATE.streak.length;
+        const reward = _getStreakReward(len);
+
+        STATE.points = (parseInt(STATE.points) || 0) + reward;
+        Auth.saveState();
+        UI.updateHUD();
+
+        _spawnStreakStars();
+        if (typeof Sound !== 'undefined') Sound.playSinewave(528);
+
         if (len === 7) {
-            UI.addPoints(CONFIG.POINTS.STREAK_7);
-            UI.showToast('🏅 7 ngày liên tiếp! +200 ✨ & danh hiệu "Người giữ lửa Trạm"!');
+            UI.showToast(`🏅 7 ngày liên tiếp! +${reward} ✨ Danh hiệu "Người giữ lửa Trạm"!`, 5000);
         } else if (len >= 4) {
-            UI.addPoints(CONFIG.POINTS.STREAK_4_6);
+            UI.showToast(`🔥 Streak ${len} ngày! +${reward} ✨`, 4000);
         } else {
-            UI.addPoints(CONFIG.POINTS.STREAK_1_3);
+            UI.showToast(`⭐ Điểm danh ngày ${len}! +${reward} ✨`, 3500);
+        }
+
+        _syncPointsToServer(reward);
+        _syncStreakToServer(STATE.streak);
+
+        setTimeout(() => _renderStreak(), 50);
+    }
+
+    function _spawnStreakStars() {
+        const el = document.getElementById('streak-mini');
+        if (!el) { _spawnDustParticles(); return; }
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        for (let i = 0; i < 16; i++) {
+            setTimeout(() => {
+                const p = document.createElement('div');
+                p.className = 'dust-particle';
+                const size = 3 + Math.random() * 5;
+                const angle = (Math.PI * 2 * i) / 16;
+                const dist = 40 + Math.random() * 60;
+                p.style.cssText = `
+                    width:${size}px; height:${size}px;
+                    left:${cx}px; top:${cy}px;
+                    --dx:${Math.cos(angle) * dist}px;
+                    --dy:${Math.sin(angle) * dist}px;
+                    background: var(--accent-gold);
+                `;
+                document.body.appendChild(p);
+                setTimeout(() => p.remove(), 1300);
+            }, i * 40);
         }
     }
 
     function _renderStreak() {
         const el = document.getElementById('streak-mini');
         if (!el) return;
+
         const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
         const todayIdx = (new Date().getDay() + 6) % 7;
-
-        // FIX: Đảm bảo STATE.streak là array
+        const today = _today();
         if (!Array.isArray(STATE.streak)) STATE.streak = [];
+        const checkedIn = STATE.streak.includes(today);
 
         el.innerHTML = '';
         days.forEach((d, i) => {
             const dateStr = _getDateForDayIndex(i);
             const done = STATE.streak.includes(dateStr);
             const isToday = i === todayIdx;
-            const special = i === 6;
+            const canCheckIn = isToday && !checkedIn;
+
             const div = document.createElement('div');
-            div.className = `streak-day${done ? ' done' : ''}${isToday ? ' today' : ''}${special ? ' special' : ''}`;
-            div.textContent = d;
+            div.className = [
+                'streak-day',
+                done ? 'done' : '',
+                isToday ? 'today' : '',
+                i === 6 ? 'special' : '',
+                canCheckIn ? 'can-checkin' : ''
+            ].filter(Boolean).join(' ');
+
+            if (canCheckIn) {
+                // Trạng thái 2: hôm nay CHƯA điểm danh
+                div.innerHTML = `
+                    <span class="streak-day-label">${d}</span>
+                    <span class="streak-checkin-icon">✦</span>
+                    <span class="streak-checkin-hint">Tap!</span>
+                `;
+                div.title = 'Bấm để điểm danh hôm nay!';
+                div.setAttribute('role', 'button');
+                div.onclick = (e) => { e.stopPropagation(); _doCheckIn(); };
+
+            } else if (isToday && done) {
+                // Trạng thái 3: hôm nay ĐÃ điểm danh
+                div.innerHTML = `
+                    <span class="streak-day-label">${d}</span>
+                    <span style="font-size:0.85rem;line-height:1;color:rgba(206,147,216,0.9)">✓</span>
+                `;
+                div.title = 'Đã điểm danh hôm nay ✓';
+
+            } else {
+                // Trạng thái 1: ngày khác
+                div.textContent = d;
+                if (done) div.title = 'Đã điểm danh ✓';
+            }
+
             el.appendChild(div);
         });
     }
@@ -395,6 +538,22 @@ const Missions = (() => {
         const target = new Date(now);
         target.setDate(now.getDate() + mondayOffset + i);
         return target.toISOString().slice(0, 10);
+    }
+
+    async function _syncStreakToServer(dates) {
+        if (!STATE.user?.token || STATE.user.token === 'local') return;
+        try {
+            await fetch(`${CONFIG.API_BASE}/auth/streak`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${STATE.user.token}`
+                },
+                body: JSON.stringify({ dates })
+            });
+        } catch {
+            console.warn('Offline: streak lưu local.');
+        }
     }
 
     /* ---------- DUST PARTICLES ---------- */
@@ -417,14 +576,13 @@ const Missions = (() => {
         }
     }
 
-    /* ---------- INIT INPUT PANEL TOGGLE ---------- */
+    /* ---------- INIT INPUT ---------- */
     function _initInput() {
         const icon = document.getElementById('telescope-icon');
         const panel = document.getElementById('input-panel');
         const textarea = document.getElementById('signal-text');
         const charCount = document.getElementById('char-count');
         const btnSend = document.getElementById('btn-send');
-
         if (!icon || !panel || !textarea || !charCount || !btnSend) return;
 
         icon.addEventListener('click', () => {
@@ -451,6 +609,7 @@ const Missions = (() => {
             textarea.value = '';
             charCount.textContent = '0';
             panel.classList.add('hidden');
+            UI.showSendBlessing();
         });
     }
 

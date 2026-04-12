@@ -1,0 +1,145 @@
+/* ================================================
+   STREAK - Điểm danh tuần
+   3 trạng thái rõ ràng:
+   1. Ngày thường (chưa tới)   → xám mờ
+   2. Hôm nay chưa điểm danh  → vàng nhấp nháy, có chữ "Điểm danh"
+   3. Đã điểm danh             → tím sáng, có dấu ✓
+   ================================================ */
+
+/* ---- Container ---- */
+#streak-mini {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 8px 0 4px;
+}
+
+/* ---- Base ô ngày ---- */
+.streak-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 48px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.25);
+    transition: all 0.2s ease;
+    position: relative;
+    cursor: default;
+    user-select: none;
+    gap: 2px;
+}
+
+/* ---- Đã điểm danh ---- */
+.streak-day.done {
+    background: rgba(126, 87, 194, 0.25);
+    border-color: rgba(206, 147, 216, 0.5);
+    color: rgba(206, 147, 216, 0.9);
+}
+
+/* Dấu ✓ nhỏ bên dưới chữ ngày */
+.streak-day.done::after {
+    content: '✓';
+    font-size: 0.6rem;
+    color: rgba(206, 147, 216, 0.7);
+    line-height: 1;
+}
+
+/* ---- Hôm nay chưa điểm danh → CTA rõ ràng ---- */
+.streak-day.can-checkin {
+    width: 52px;
+    height: 60px;
+    border-radius: 14px;
+    background: rgba(255, 213, 79, 0.12);
+    border: 2px solid var(--accent-gold, #ffd54f);
+    color: var(--accent-gold, #ffd54f);
+    cursor: pointer;
+    animation: streakPulse 1.8s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(255, 213, 79, 0.2);
+}
+
+/* Label ngày (T2, T3...) */
+.streak-day-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Chữ "Tap!" nhỏ bên dưới */
+.streak-checkin-hint {
+    font-size: 0.55rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: var(--accent-gold, #ffd54f);
+    opacity: 0.85;
+    line-height: 1;
+}
+
+/* Icon ✦ nhấp nháy */
+.streak-checkin-icon {
+    font-size: 0.75rem;
+    color: var(--accent-gold, #ffd54f);
+    animation: streakIconBlink 1s ease-in-out infinite;
+    line-height: 1;
+}
+
+/* Hover */
+.streak-day.can-checkin:hover {
+    background: rgba(255, 213, 79, 0.25);
+    border-color: #ffd54f;
+    box-shadow: 0 0 20px rgba(255, 213, 79, 0.45);
+    transform: scale(1.1) translateY(-2px);
+}
+
+/* Active / tap */
+.streak-day.can-checkin:active {
+    transform: scale(0.93);
+    box-shadow: 0 0 8px rgba(255, 213, 79, 0.2);
+}
+
+/* ---- Hôm nay đã điểm danh (today + done) ---- */
+.streak-day.today.done {
+    background: rgba(126, 87, 194, 0.35);
+    border-color: rgba(206, 147, 216, 0.8);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(206, 147, 216, 0.3);
+}
+
+/* ---- CN special (tím đậm hơn khi done) ---- */
+.streak-day.special.done {
+    background: rgba(206, 147, 216, 0.2);
+    border-color: rgba(206, 147, 216, 0.6);
+}
+
+/* ---- Animations ---- */
+@keyframes streakPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 12px rgba(255, 213, 79, 0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 22px rgba(255, 213, 79, 0.5), 0 0 0 4px rgba(255, 213, 79, 0.12);
+    }
+}
+
+@keyframes streakIconBlink {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.3;
+        transform: scale(0.75);
+    }
+}

@@ -44,7 +44,7 @@
     }
 }
 
-/* Star breath (4s cycle matching breathing) */
+/* Star breath */
 @keyframes starBreath {
 
     0%,
@@ -166,20 +166,62 @@
     }
 }
 
-/* Meteor shooting */
+/* =====================================================================
+   SHOOTING STAR - bay từ phải sang trái chéo xuống, mượt & đẹp
+   ===================================================================== */
 @keyframes shootingMeteor {
     0% {
-        transform: translateX(0) translateY(0);
+        transform: translate(0, 0) rotate(-35deg);
+        opacity: 0;
+    }
+
+    4% {
+        opacity: 1;
+    }
+
+    88% {
         opacity: 1;
     }
 
     100% {
-        transform: translateX(-60vw) translateY(40vh);
+        transform: translate(-110vw, 55vh) rotate(-35deg);
         opacity: 0;
     }
 }
 
-/* Meteor rain (shorter, multiple) */
+/* Đầu sao băng nhấp nháy */
+@keyframes meteorHeadPulse {
+
+    0%,
+    100% {
+        box-shadow:
+            0 0 8px 4px rgba(255, 255, 255, 0.95),
+            0 0 24px 10px rgba(200, 220, 255, 0.55),
+            0 0 48px 20px rgba(180, 210, 255, 0.25);
+    }
+
+    50% {
+        box-shadow:
+            0 0 12px 6px rgba(255, 255, 255, 1),
+            0 0 36px 16px rgba(180, 210, 255, 0.75),
+            0 0 72px 30px rgba(150, 190, 255, 0.35);
+    }
+}
+
+/* Đuôi sao băng ripple khi bắt được */
+@keyframes catchRipple {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(3.5);
+        opacity: 0;
+    }
+}
+
+/* Meteor rain (ngắn, nhiều cái) */
 @keyframes meteorRain {
     0% {
         transform: translate(0, 0) rotate(-45deg);
@@ -231,7 +273,7 @@
     }
 }
 
-/* Breathing expand/contract */
+/* Breathing */
 @keyframes breatheIn {
     from {
         transform: scale(1);

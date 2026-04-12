@@ -115,6 +115,7 @@ const App = (() => {
             Stars.sendSignal(text, STATE.activeStarType || 'normal');
             textarea.value = '';
             charCount.textContent = '0';
+            UI.showSendBlessing(); // ✅ Lời chúc ngẫu nhiên sau khi gửi
         });
     }
 

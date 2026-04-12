@@ -96,26 +96,91 @@ body::before {
     animation: flyUp 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-/* Meteor overlay line */
+/* =============================================
+   METEOR LINE - dùng cho meteor rain (ngắn)
+   ============================================= */
 .meteor-line {
     position: fixed;
     z-index: 50;
     width: 3px;
     height: 80px;
     border-radius: 2px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.9));
+    background: linear-gradient(to bottom,
+            rgba(255, 255, 255, 0),
+            rgba(255, 255, 255, 0.9));
     pointer-events: all;
     cursor: pointer;
     animation: meteorRain 1.2s ease-out forwards;
     transform-origin: top;
 }
 
-.meteor-line.clickable::after {
-    content: '✨';
+/* =============================================================
+   SHOOTING STAR - wrapper + tail + glow + head
+   ============================================================= */
+.shooting-star-wrapper {
+    position: fixed;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 500;
+}
+
+.shooting-star-tail {
     position: absolute;
-    top: 0;
-    left: -10px;
-    font-size: 1rem;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 220px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(to left,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(180, 210, 255, 0.08) 20%,
+            rgba(200, 225, 255, 0.25) 45%,
+            rgba(220, 238, 255, 0.65) 72%,
+            rgba(255, 255, 255, 0.95) 100%);
+    pointer-events: none;
+}
+
+.shooting-star-glow {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 160px;
+    height: 10px;
+    border-radius: 999px;
+    background: linear-gradient(to left,
+            rgba(180, 210, 255, 0) 0%,
+            rgba(180, 210, 255, 0.18) 60%,
+            rgba(200, 225, 255, 0.35) 100%);
+    filter: blur(5px);
+    pointer-events: none;
+}
+
+.shooting-star-head {
+    position: absolute;
+    right: -6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%,
+            #ffffff 0%,
+            #d8ecff 55%,
+            #a8ccff 100%);
+    animation: meteorHeadPulse 0.7s ease-in-out infinite;
+    padding: 14px;
+    margin: -14px;
+    box-sizing: content-box;
+    cursor: pointer;
+    pointer-events: all;
+    z-index: 501;
+}
+
+.shooting-star-head:hover {
+    transform: translateY(-50%) scale(1.6);
 }
 
 /* Void absorbed text */
@@ -281,5 +346,212 @@ body::before {
 
     .react-btn:active {
         transform: scale(1.3);
+    }
+
+    .shooting-star-head:active {
+        transform: translateY(-50%) scale(2);
+    }
+}
+
+
+/* ================================================
+   HEAL PANEL
+   ================================================ */
+
+/* Ô quote nổi bật */
+.heal-quote-box {
+    background: linear-gradient(135deg,
+            rgba(206, 147, 216, 0.12) 0%,
+            rgba(126, 87, 194, 0.08) 100%);
+    border: 1px solid rgba(206, 147, 216, 0.25);
+    border-radius: 16px;
+    padding: 20px 18px;
+    margin: 16px 0 14px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Glow trang trí góc trái */
+.heal-quote-box::before {
+    content: '✦';
+    position: absolute;
+    top: 10px;
+    left: 14px;
+    font-size: 0.65rem;
+    color: rgba(206, 147, 216, 0.4);
+}
+
+.heal-quote-text {
+    font-size: 0.92rem;
+    line-height: 1.65;
+    color: rgba(255, 255, 255, 0.88);
+    font-style: italic;
+    text-align: center;
+    margin: 0;
+    padding: 0 4px;
+    transition: opacity 0.3s ease;
+}
+
+/* ---- Nút "Câu khác" ---- */
+.btn-new-quote {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    padding: 11px 0;
+    border-radius: 50px;
+    border: 1.5px solid rgba(206, 147, 216, 0.45);
+    background: linear-gradient(135deg,
+            rgba(206, 147, 216, 0.15) 0%,
+            rgba(126, 87, 194, 0.1) 100%);
+    color: rgba(206, 147, 216, 0.95);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition:
+        background 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.15s ease,
+        box-shadow 0.25s ease;
+}
+
+/* Shimmer trượt qua khi hover */
+.btn-new-quote::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(120deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.12) 50%,
+            transparent 100%);
+    transition: left 0.4s ease;
+}
+
+.btn-new-quote:hover::after {
+    left: 130%;
+}
+
+.btn-new-quote:hover {
+    background: linear-gradient(135deg,
+            rgba(206, 147, 216, 0.28) 0%,
+            rgba(126, 87, 194, 0.2) 100%);
+    border-color: rgba(206, 147, 216, 0.7);
+    box-shadow:
+        0 0 18px rgba(206, 147, 216, 0.25),
+        inset 0 0 12px rgba(206, 147, 216, 0.05);
+    transform: translateY(-1px);
+    color: #fff;
+}
+
+.btn-new-quote:active {
+    transform: translateY(1px) scale(0.98);
+    box-shadow: 0 0 8px rgba(206, 147, 216, 0.15);
+}
+
+/* ---- Danh sách tất cả quotes ---- */
+.heal-quotes-list {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    max-height: 320px;
+    padding-right: 4px;
+}
+
+.heal-quote-item {
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    transition: background 0.2s ease, color 0.2s ease;
+    cursor: default;
+}
+
+.heal-quote-item:hover {
+    background: rgba(206, 147, 216, 0.08);
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(206, 147, 216, 0.18);
+}
+
+
+/* ================================================
+   STREAK - Điểm danh thủ công
+   ================================================ */
+
+/* Ô có thể điểm danh hôm nay */
+.streak-day.can-checkin {
+    position: relative;
+    cursor: pointer;
+    border-color: var(--accent-gold) !important;
+    color: var(--accent-gold) !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    animation: streakPulse 1.8s ease-in-out infinite;
+}
+
+.streak-day-label {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+/* Icon ✦ nhấp nháy bên dưới chữ ngày */
+.streak-checkin-icon {
+    font-size: 0.6rem;
+    color: var(--accent-gold);
+    animation: streakIconBlink 1s ease-in-out infinite;
+    line-height: 1;
+}
+
+/* Hover: glow vàng */
+.streak-day.can-checkin:hover {
+    background: rgba(255, 213, 79, 0.18) !important;
+    box-shadow: 0 0 16px rgba(255, 213, 79, 0.4);
+    transform: scale(1.15);
+}
+
+/* Active: nhấn xuống */
+.streak-day.can-checkin:active {
+    transform: scale(0.95);
+}
+
+/* Pulse border vàng */
+@keyframes streakPulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(255, 213, 79, 0);
+    }
+
+    50% {
+        box-shadow: 0 0 0 4px rgba(255, 213, 79, 0.25);
+    }
+}
+
+/* Icon nhấp nháy */
+@keyframes streakIconBlink {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        transform: scale(0.8);
     }
 }
