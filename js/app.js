@@ -69,7 +69,7 @@ const App = (() => {
         UI.showWelcome();
         UI.startRandomQuotes();
 
-        // Missions
+        // Missions (đã bao gồm _initInput với toxic check đầy đủ)
         Missions.init();
 
         // Stars
@@ -78,9 +78,6 @@ const App = (() => {
         Stars.startShootingStarCycle();
         Stars.startMeteorRain();
 
-        // Center input box
-        _initCenterInput();
-
         // Sound
         Sound.initButtons();
 
@@ -88,35 +85,6 @@ const App = (() => {
         setTimeout(() => {
             UI.showToast('💫 ' + CONFIG.QUOTES[0], 5000);
         }, 30000);
-    }
-
-    function _initCenterInput() {
-        const textarea = document.getElementById('signal-text');
-        const charCount = document.getElementById('char-count');
-        const btnSend = document.getElementById('btn-send');
-
-        if (!textarea || !btnSend) return;
-
-        textarea.addEventListener('input', () => {
-            charCount.textContent = textarea.value.length;
-        });
-
-        document.querySelectorAll('.star-type').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.star-type').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                STATE.activeStarType = btn.dataset.type;
-            });
-        });
-
-        btnSend.addEventListener('click', () => {
-            const text = textarea.value.trim();
-            if (!text) return;
-            Stars.sendSignal(text, STATE.activeStarType || 'normal');
-            textarea.value = '';
-            charCount.textContent = '0';
-            UI.showSendBlessing(); // ✅ Lời chúc ngẫu nhiên sau khi gửi
-        });
     }
 
     function _sleep(ms) { return new Promise(r => setTimeout(r, ms)); }

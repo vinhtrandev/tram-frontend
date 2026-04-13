@@ -1,6 +1,13 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - sound.js
+   TRẠM GỬI TÍN HIỆU - sound.js (FULL v3)
    Web Audio API: ambient sounds + sinewave tones
+   + Background Music từ file MP3
+   + playVoidEffect(type) — âm thanh riêng cho từng hiệu ứng ngẫu nhiên
+
+   Logic âm thanh:
+   - Mặc định: nhạc nền MP3 tự chạy khi vào game
+   - Bấm ASMR (mưa/sóng/chuông): tắt nhạc nền, bật ASMR
+   - Bấm 🔇 hoặc tắt ASMR: tắt ASMR, bật lại nhạc nền
    ================================================ */
 
 const Sound = (() => {
@@ -9,12 +16,302 @@ const Sound = (() => {
     let currentNode = null;
     let gainNode = null;
 
+    /* --- BGM state --- */
+    let bgmAudio = null;
+    let bgmActive = false;
+
+    /* --- Void whoosh state --- */
+    let _voidWhooshNode = null;
+    let _voidWhooshGain = null;
+
     function _getCtx() {
         if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
         return ctx;
     }
 
-    /* ---------- AMBIENT GENERATOR ---------- */
+    /* ============================================================
+       BACKGROUND MUSIC — file MP3
+    ============================================================ */
+
+    function startBGM() {
+        if (bgmActive) return;
+
+        if (!bgmAudio) {
+            bgmAudio = new Audio('nhacnen.mp3');
+            bgmAudio.loop = true;
+            bgmAudio.volume = 0;
+        }
+
+        bgmAudio.play().then(() => {
+            bgmActive = true;
+            _fadeVolume(bgmAudio, 0, 0.3, 1500);
+            _updateBGMBtn(true);
+        }).catch(() => {
+            document.addEventListener('click', _retryBGM, { once: true });
+        });
+    }
+
+    function _retryBGM() {
+        if (bgmActive) return;
+        if (!bgmAudio) return;
+        bgmAudio.play().then(() => {
+            bgmActive = true;
+            _fadeVolume(bgmAudio, 0, 0.3, 1500);
+            _updateBGMBtn(true);
+        }).catch(() => { });
+    }
+
+    function stopBGM(onDone) {
+        if (!bgmActive || !bgmAudio) {
+            if (onDone) onDone();
+            return;
+        }
+        bgmActive = false;
+        _fadeVolume(bgmAudio, bgmAudio.volume, 0, 800, () => {
+            bgmAudio.pause();
+            bgmAudio.currentTime = 0;
+            _updateBGMBtn(false);
+            if (onDone) onDone();
+        });
+    }
+
+    function _updateBGMBtn(on) {
+        const btn = document.getElementById('bgm-toggle-btn');
+        if (!btn) return;
+        btn.classList.toggle('active', on);
+        btn.title = on ? 'Tắt nhạc nền' : 'Bật nhạc nền';
+    }
+
+    function _fadeVolume(audio, from, to, duration, onDone) {
+        const steps = 30;
+        const interval = duration / steps;
+        const delta = (to - from) / steps;
+        let current = from;
+        let count = 0;
+        audio.volume = Math.max(0, Math.min(1, from));
+        const timer = setInterval(() => {
+            count++;
+            current += delta;
+            audio.volume = Math.max(0, Math.min(1, current));
+            if (count >= steps) {
+                clearInterval(timer);
+                audio.volume = Math.max(0, Math.min(1, to));
+                if (onDone) onDone();
+            }
+        }, interval);
+    }
+
+    /* ============================================================
+       HỐ ĐEN — VOID SOUNDS
+    ============================================================ */
+
+    /* Whoosh hút: tiếng ào ào khi đang giữ hố đen, tăng dần */
+    function startVoidWhoosh() {
+        try {
+            const c = _getCtx();
+            stopVoidWhoosh();
+
+            const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+
+            const src = c.createBufferSource();
+            src.buffer = buf;
+            src.loop = true;
+
+            const filter = c.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 120;
+            filter.Q.value = 0.8;
+
+            const lfo = c.createOscillator();
+            const lfoGain = c.createGain();
+            lfo.frequency.value = 0.8;
+            lfoGain.gain.value = 80;
+            lfo.connect(lfoGain);
+            lfoGain.connect(filter.frequency);
+            lfo.start();
+
+            _voidWhooshGain = c.createGain();
+            _voidWhooshGain.gain.setValueAtTime(0, c.currentTime);
+            _voidWhooshGain.gain.linearRampToValueAtTime(0.35, c.currentTime + 10);
+
+            src.connect(filter);
+            filter.connect(_voidWhooshGain);
+            _voidWhooshGain.connect(c.destination);
+            src.start();
+
+            _voidWhooshNode = { src, lfo };
+        } catch (e) { console.warn('startVoidWhoosh error:', e); }
+    }
+
+    function stopVoidWhoosh() {
+        try {
+            if (_voidWhooshNode?.src) _voidWhooshNode.src.stop();
+            if (_voidWhooshNode?.lfo) _voidWhooshNode.lfo.stop();
+            if (_voidWhooshGain) _voidWhooshGain.disconnect();
+        } catch { }
+        _voidWhooshNode = null;
+        _voidWhooshGain = null;
+    }
+
+    /* Âm thanh thiền sau khi xả xong — sóng 396Hz + reverb sâu */
+    function playVoidRelease() {
+        stopVoidWhoosh();
+        try {
+            const c = _getCtx();
+            const now = c.currentTime;
+
+            const rvBuf = c.createBuffer(2, c.sampleRate * 4, c.sampleRate);
+            [0, 1].forEach(ch => {
+                const d = rvBuf.getChannelData(ch);
+                for (let i = 0; i < d.length; i++)
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.2);
+            });
+            const rev = c.createConvolver();
+            rev.buffer = rvBuf;
+            const revGain = c.createGain();
+            revGain.gain.value = 0.5;
+            rev.connect(revGain);
+            revGain.connect(c.destination);
+
+            /* 3 tầng sóng: 396Hz (giải phóng), 528Hz (chữa lành), 174Hz (nền sâu) */
+            const layers = [
+                { freq: 174, gain: 0.12, decay: 4.5, delay: 0 },
+                { freq: 396, gain: 0.20, decay: 3.8, delay: 0.1 },
+                { freq: 528, gain: 0.15, decay: 3.2, delay: 0.3 },
+            ];
+
+            layers.forEach(({ freq, gain, decay, delay }) => {
+                const osc = c.createOscillator();
+                const env = c.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                env.gain.setValueAtTime(0, now + delay);
+                env.gain.linearRampToValueAtTime(gain, now + delay + 0.15);
+                env.gain.exponentialRampToValueAtTime(0.0001, now + delay + decay);
+                osc.connect(env);
+                env.connect(c.destination);
+                env.connect(rev);
+                osc.start(now + delay);
+                osc.stop(now + delay + decay + 0.2);
+            });
+
+            /* Whoosh thoát ra — tiếng ào tắt dần */
+            const noiseBuf = c.createBuffer(1, c.sampleRate * 1.5, c.sampleRate);
+            const nd = noiseBuf.getChannelData(0);
+            for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+            const nSrc = c.createBufferSource();
+            nSrc.buffer = noiseBuf;
+            const nFilter = c.createBiquadFilter();
+            nFilter.type = 'lowpass';
+            nFilter.frequency.setValueAtTime(800, now);
+            nFilter.frequency.exponentialRampToValueAtTime(80, now + 1.5);
+            const nGain = c.createGain();
+            nGain.gain.setValueAtTime(0.25, now);
+            nGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+            nSrc.connect(nFilter);
+            nFilter.connect(nGain);
+            nGain.connect(c.destination);
+            nSrc.start(now);
+            nSrc.stop(now + 1.6);
+
+        } catch (e) { console.warn('playVoidRelease error:', e); }
+    }
+
+    /* ============================================================
+       playVoidEffect(type) — âm thanh riêng cho từng random effect
+       type: 'stardust' | 'light' | 'energy' | 'nebula'
+    ============================================================ */
+    function playVoidEffect(type) {
+        try {
+            const c = _getCtx();
+            const now = c.currentTime;
+
+            /* Reverb chung — nhỏ hơn playVoidRelease để không đè */
+            const rvBuf = c.createBuffer(2, c.sampleRate * 2.5, c.sampleRate);
+            [0, 1].forEach(ch => {
+                const d = rvBuf.getChannelData(ch);
+                for (let i = 0; i < d.length; i++)
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.5);
+            });
+            const rev = c.createConvolver();
+            rev.buffer = rvBuf;
+            const revGain = c.createGain();
+            revGain.gain.value = 0.25;
+            rev.connect(revGain);
+            revGain.connect(c.destination);
+
+            const presets = {
+                /* Vũ trụ mở rộng — Solfeggio 741Hz (thức tỉnh) + 852Hz (tâm linh) */
+                stardust: [
+                    { freq: 741, gain: 0.10, decay: 2.2, delay: 0, type: 'sine' },
+                    { freq: 852, gain: 0.07, decay: 1.8, delay: 0.15, type: 'sine' },
+                    { freq: 1480, gain: 0.03, decay: 1.2, delay: 0.3, type: 'sine' },
+                ],
+                /* Ánh sáng giải phóng — arpeggio sáng, nhanh */
+                light: [
+                    { freq: 528, gain: 0.13, decay: 1.5, delay: 0, type: 'sine' },
+                    { freq: 660, gain: 0.10, decay: 1.3, delay: 0.08, type: 'sine' },
+                    { freq: 792, gain: 0.08, decay: 1.1, delay: 0.16, type: 'sine' },
+                    { freq: 1056, gain: 0.05, decay: 0.9, delay: 0.24, type: 'sine' },
+                ],
+                /* Năng lượng tái sinh — 285Hz (tái tạo tế bào) + pulse nhẹ */
+                energy: [
+                    { freq: 285, gain: 0.15, decay: 3.0, delay: 0, type: 'sine' },
+                    { freq: 417, gain: 0.10, decay: 2.5, delay: 0.2, type: 'sine' },
+                    { freq: 570, gain: 0.06, decay: 2.0, delay: 0.4, type: 'sine' },
+                ],
+                /* Tinh vân thức tỉnh — pad sâu + overtone */
+                nebula: [
+                    { freq: 111, gain: 0.14, decay: 4.0, delay: 0, type: 'sine' },
+                    { freq: 222, gain: 0.08, decay: 3.5, delay: 0.1, type: 'sine' },
+                    { freq: 333, gain: 0.05, decay: 3.0, delay: 0.2, type: 'sine' },
+                    { freq: 444, gain: 0.03, decay: 2.5, delay: 0.3, type: 'sine' },
+                ],
+            };
+
+            const layers = presets[type] || presets.stardust;
+
+            layers.forEach(({ freq, gain, decay, delay, type: waveType }) => {
+                const osc = c.createOscillator();
+                const env = c.createGain();
+                osc.type = waveType || 'sine';
+                osc.frequency.value = freq;
+                env.gain.setValueAtTime(0, now + delay);
+                env.gain.linearRampToValueAtTime(gain, now + delay + 0.1);
+                env.gain.exponentialRampToValueAtTime(0.0001, now + delay + decay);
+                osc.connect(env);
+                env.connect(c.destination);
+                env.connect(rev);
+                osc.start(now + delay);
+                osc.stop(now + delay + decay + 0.15);
+            });
+
+            /* Thêm tiếng "ping" nhỏ cho stardust và light */
+            if (type === 'stardust' || type === 'light') {
+                const ping = c.createOscillator();
+                const pingEnv = c.createGain();
+                ping.type = 'sine';
+                ping.frequency.setValueAtTime(type === 'light' ? 1320 : 1110, now);
+                ping.frequency.exponentialRampToValueAtTime(type === 'light' ? 660 : 555, now + 0.4);
+                pingEnv.gain.setValueAtTime(0, now);
+                pingEnv.gain.linearRampToValueAtTime(0.08, now + 0.02);
+                pingEnv.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+                ping.connect(pingEnv);
+                pingEnv.connect(c.destination);
+                pingEnv.connect(rev);
+                ping.start(now);
+                ping.stop(now + 0.6);
+            }
+
+        } catch (e) { console.warn('playVoidEffect error:', e); }
+    }
+
+    /* ============================================================
+       AMBIENT GENERATORS
+    ============================================================ */
+
     function _createRainNoise() {
         const c = _getCtx();
         const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
@@ -49,8 +346,6 @@ const Sound = (() => {
     function _createWindChime() {
         const c = _getCtx();
         const notes = [523, 659, 784, 880, 1047];
-        const merger = c.createChannelMerger(1);
-        const src = { start: () => { }, stop: () => { } };
 
         function ring() {
             if (!ctx) return;
@@ -66,13 +361,28 @@ const Sound = (() => {
             setTimeout(ring, 800 + Math.random() * 3000);
         }
         setTimeout(ring, 500);
-        return { src: { start: () => { }, stop: () => clearTimeout(ring) }, output: merger };
+        const merger = c.createChannelMerger(1);
+        return { src: { start: () => { }, stop: () => { } }, output: merger };
     }
 
     /* ---------- PLAY AMBIENT ---------- */
     function playAmbient(type) {
-        stop();
-        if (type === 'off') return;
+        if (type === 'off') {
+            _stopAmbient();
+            STATE.currentSound = 'off';
+            startBGM();
+            return;
+        }
+
+        if (bgmActive) {
+            stopBGM(() => _startAmbient(type));
+        } else {
+            _startAmbient(type);
+        }
+    }
+
+    function _startAmbient(type) {
+        _stopAmbient();
         const c = _getCtx();
         gainNode = c.createGain();
         gainNode.gain.value = 0.15;
@@ -88,10 +398,10 @@ const Sound = (() => {
                 node.src.start();
                 currentNode = node;
             }
-        } catch { /* AudioContext not supported */ }
+        } catch { }
     }
 
-    function stop() {
+    function _stopAmbient() {
         try {
             if (currentNode?.src) currentNode.src.stop();
             if (currentNode?.extra) currentNode.extra.forEach(n => n.stop());
@@ -100,13 +410,14 @@ const Sound = (() => {
         currentNode = null; gainNode = null;
     }
 
-    /* ---------- BELL - tiếng chuông crystal bowl khi gửi tín hiệu ---------- */
+    function stop() { _stopAmbient(); }
+
+    /* ---------- BELL ---------- */
     function playBell() {
         try {
             const c = _getCtx();
             const now = c.currentTime;
 
-            // Reverb ngắn để âm ngân trong không gian
             const rvBuf = c.createBuffer(2, c.sampleRate * 2, c.sampleRate);
             [0, 1].forEach(ch => {
                 const d = rvBuf.getChannelData(ch);
@@ -120,7 +431,6 @@ const Sound = (() => {
             rev.connect(revGain);
             revGain.connect(c.destination);
 
-            // 3 lớp sine chồng nhau → âm crystal bowl ấm
             const layers = [
                 { freq: 528, gain: 0.18, decay: 2.6 },
                 { freq: 1056, gain: 0.09, decay: 1.8 },
@@ -130,27 +440,18 @@ const Sound = (() => {
                 const osc = c.createOscillator();
                 const env = c.createGain();
                 const pan = c.createStereoPanner();
-
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, now);
                 osc.frequency.exponentialRampToValueAtTime(freq * 1.004, now + 0.1);
-
                 env.gain.setValueAtTime(0, now);
                 env.gain.linearRampToValueAtTime(gain, now + 0.012);
                 env.gain.exponentialRampToValueAtTime(0.0001, now + decay);
-
                 pan.pan.value = (i - 1) * 0.12;
-
-                osc.connect(env);
-                env.connect(pan);
-                pan.connect(c.destination);
-                pan.connect(rev);
-
-                osc.start(now);
-                osc.stop(now + decay + 0.1);
+                osc.connect(env); env.connect(pan);
+                pan.connect(c.destination); pan.connect(rev);
+                osc.start(now); osc.stop(now + decay + 0.1);
             });
 
-            // Sub-bass nhẹ → độ sâu ấm
             const sub = c.createOscillator();
             const subG = c.createGain();
             sub.type = 'sine';
@@ -158,42 +459,30 @@ const Sound = (() => {
             subG.gain.setValueAtTime(0, now);
             subG.gain.linearRampToValueAtTime(0.05, now + 0.02);
             subG.gain.exponentialRampToValueAtTime(0.0001, now + 0.7);
-            sub.connect(subG);
-            subG.connect(c.destination);
-            sub.start(now);
-            sub.stop(now + 0.8);
+            sub.connect(subG); subG.connect(c.destination);
+            sub.start(now); sub.stop(now + 0.8);
 
-        } catch (e) {
-            console.warn('Sound.playBell error:', e);
-        }
+        } catch (e) { console.warn('Sound.playBell error:', e); }
     }
 
-    /* ---------- SINEWAVE (star click / reward) ---------- */
+    /* ---------- SINEWAVE ---------- */
     function playSinewave(freq = 528) {
         try {
             const c = _getCtx();
             const osc = c.createOscillator();
             const env = c.createGain();
             const rev = c.createConvolver();
-
             osc.type = 'sine'; osc.frequency.value = freq;
-
             const rvBuf = c.createBuffer(2, c.sampleRate * 3, c.sampleRate);
             [0, 1].forEach(ch => {
                 const d = rvBuf.getChannelData(ch);
                 for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
             });
             rev.buffer = rvBuf;
-
             env.gain.setValueAtTime(0, c.currentTime);
             env.gain.linearRampToValueAtTime(0.3, c.currentTime + 0.05);
             env.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 2.5);
-
-            osc.connect(env);
-            env.connect(rev);
-            rev.connect(c.destination);
-            env.connect(c.destination);
-
+            osc.connect(env); env.connect(rev); rev.connect(c.destination); env.connect(c.destination);
             osc.start(); osc.stop(c.currentTime + 3);
         } catch { }
     }
@@ -205,7 +494,6 @@ const Sound = (() => {
         'wind': 'sound_wind'
     };
 
-    /* ---------- CHECK UNLOCK ---------- */
     function _isUnlocked(type) {
         if (type === 'off') return true;
         const itemId = SOUND_ITEM_MAP[type];
@@ -213,7 +501,7 @@ const Sound = (() => {
         return !!STATE.unlocked[itemId];
     }
 
-    /* ---------- INIT SOUND BUTTONS ---------- */
+    /* ---------- INIT ---------- */
     function initButtons() {
         document.querySelectorAll('.sound-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -227,20 +515,43 @@ const Sound = (() => {
                 document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 STATE.currentSound = type;
+
                 playAmbient(type);
+
+                if (type !== 'off') {
+                    UI.showToast(
+                        type === 'rain' ? '🌧 Tiếng mưa Đà Lạt' :
+                            type === 'wave' ? '🌊 Sóng biển đêm' :
+                                '🔔 Chuông gió ngân xa', 2000
+                    );
+                }
             });
         });
 
-        if (_isUnlocked(STATE.currentSound)) {
-            playAmbient(STATE.currentSound);
-        } else {
-            STATE.currentSound = 'off';
-            document.querySelectorAll('.sound-btn').forEach(b => {
-                if (b.dataset.sound === 'off') b.classList.add('active');
-                else b.classList.remove('active');
+        STATE.currentSound = 'off';
+        document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+        startBGM();
+
+        const bgmBtn = document.getElementById('bgm-toggle-btn');
+        if (bgmBtn) {
+            bgmBtn.addEventListener('click', () => {
+                if (bgmActive) {
+                    stopBGM();
+                } else {
+                    _stopAmbient();
+                    document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+                    STATE.currentSound = 'off';
+                    startBGM();
+                }
+                UI.showToast(bgmActive ? '🎵 Nhạc nền đang phát' : '🔇 Nhạc nền tắt', 2000);
             });
         }
     }
 
-    return { playAmbient, stop, playSinewave, playBell, initButtons };
+    return {
+        playAmbient, stop, playSinewave, playBell,
+        initButtons, startBGM, stopBGM,
+        startVoidWhoosh, stopVoidWhoosh, playVoidRelease,
+        playVoidEffect,
+    };
 })();

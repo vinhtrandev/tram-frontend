@@ -2,6 +2,10 @@
    TRẠM GỬI TÍN HIỆU - stars.js (FIXED & HOÀN CHỈNH)
    DOM star dots, signal sending, star popup,
    shooting star event, meteor rain
+   FIX: sendSignal chỉ được gọi khi text hợp lệ
+   (toxic check đã chặn hoàn toàn ở missions.js)
+   → showHeal mặc định true, HealToast chỉ hiện
+     khi text thực sự được gửi lên server
    ================================================ */
 
 const Stars = (() => {
@@ -188,18 +192,19 @@ const Stars = (() => {
 
     /* ================================================================
        SEND SIGNAL
-       ① Tiếng chuông crystal bowl ngay khi nhấn gửi
-       ② Câu an ủi pill top-center
-       ③ Particle bay lên + tạo ngôi sao
+       - Hàm này CHỈ được gọi khi text đã vượt qua validation ở missions.js
+       - showHeal=true: hiện HealToast sau khi gửi thành công
+       - Không cần kiểm tra toxic ở đây nữa vì missions.js đã chặn trước
        ================================================================ */
-    async function sendSignal(text, type) {
-        if (!text.trim()) return;
+    async function sendSignal(text, type, showHeal = true) {
+        // Guard cuối: nếu text rỗng thì bỏ qua (không bao giờ xảy ra nếu missions.js đúng)
+        if (!text || !text.trim()) return;
 
-        // ① Tiếng chuông - phát ngay lập tức
+        // ① Tiếng chuông
         if (typeof Sound !== 'undefined') Sound.playBell();
 
-        // ② Câu an ủi pill top-center
-        if (typeof HealToast !== 'undefined') HealToast.show();
+        // ② HealToast - chỉ hiện khi showHeal=true (tức là text hợp lệ)
+        if (showHeal && typeof HealToast !== 'undefined') HealToast.show();
 
         const validType = CONFIG.STAR_TYPES[type] ? type : 'normal';
         const x = 10 + Math.random() * 78;

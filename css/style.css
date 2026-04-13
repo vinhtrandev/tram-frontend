@@ -1,5 +1,8 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - style.css  (redesign v2)
+   TRẠM GỬI TÍN HIỆU - style.css (FULL v3)
+   + .void-effect-badge — badge tên hiệu ứng ngẫu nhiên
+   + #heal-toast — toast an ủi riêng cho hố đen
+   + .void-ripple-fx — helper class cho ripple effect
    ================================================ */
 
 :root {
@@ -663,6 +666,95 @@ canvas {
     color: var(--accent-purple);
 }
 
+/* ==============================
+   VOID HEAL TOAST
+   Toast an ủi riêng cho hố đen
+   ============================== */
+#heal-toast {
+    position: fixed;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%) translateY(16px);
+    z-index: 700;
+    max-width: min(380px, 88vw);
+    padding: 14px 24px;
+    background: rgba(18, 8, 38, 0.94);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(180, 100, 255, 0.28);
+    border-radius: 18px;
+    font-family: var(--font-display);
+    font-size: 0.88rem;
+    font-style: italic;
+    color: rgba(220, 185, 255, 0.92);
+    line-height: 1.7;
+    text-align: center;
+    pointer-events: none;
+    opacity: 0;
+    box-shadow:
+        0 0 40px rgba(150, 60, 255, 0.15),
+        inset 0 0 30px rgba(100, 30, 200, 0.08);
+    transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#heal-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+#heal-toast.hiding {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+}
+
+/* ==============================
+   VOID EFFECT BADGE
+   Badge tên hiệu ứng ngẫu nhiên, góc trên phải
+   ============================== */
+#void-effect-badge {
+    position: fixed;
+    top: calc(var(--navbar-h) + 16px);
+    right: 20px;
+    z-index: 600;
+    padding: 6px 18px;
+    background: rgba(18, 6, 42, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(160, 80, 255, 0.3);
+    border-radius: 24px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: rgba(210, 170, 255, 0.92);
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 20px rgba(120, 50, 220, 0.2);
+}
+
+#void-effect-badge.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#void-effect-badge.hiding {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+/* ==============================
+   VOID RIPPLE FX
+   Helper class — không cần animation CSS
+   vì đã set inline animation string từ JS
+   ============================== */
+.void-ripple-fx {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 999;
+}
+
 /* ---- SOUND PANEL (bottom right) ---- */
 .sound-panel {
     position: fixed;
@@ -1263,5 +1355,18 @@ canvas {
     .astronaut-timer {
         bottom: 180px;
         right: 14px;
+    }
+
+    #heal-toast {
+        bottom: 20px;
+        max-width: 92vw;
+        font-size: 0.82rem;
+    }
+
+    #void-effect-badge {
+        top: calc(var(--navbar-h) + 10px);
+        right: 12px;
+        font-size: 0.72rem;
+        padding: 5px 14px;
     }
 }

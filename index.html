@@ -14,6 +14,54 @@
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/animations.css" />
     <link rel="stylesheet" href="css/components.css" />
+
+    <style>
+        /* ── BGM button ── */
+        #bgm-toggle-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            font-size: 0.72rem;
+            padding: 4px 10px;
+            transition: all 0.3s ease;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        #bgm-toggle-btn:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        #bgm-toggle-btn.active {
+            background: rgba(138, 100, 255, 0.25);
+            border-color: rgba(138, 100, 255, 0.6);
+            color: #c9b8ff;
+            box-shadow: 0 0 8px rgba(138, 100, 255, 0.3);
+        }
+
+        .sound-divider {
+            width: 100%;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+            margin: 4px 0;
+        }
+
+        .bgm-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .bgm-row-label {
+            font-size: 0.68rem;
+            color: rgba(255, 255, 255, 0.4);
+            white-space: nowrap;
+        }
+    </style>
 </head>
 
 <body>
@@ -104,7 +152,7 @@
             </div>
         </div>
 
-        <!-- ===== VOID - Hố Đen (bottom left) ===== -->
+        <!-- ===== VOID ===== -->
         <div class="void-container" id="void-container">
             <div class="void-label">Hố Đen</div>
             <div class="void" id="void">
@@ -121,9 +169,19 @@
             <div class="void-hint">Giữ 10s để buông bỏ</div>
         </div>
 
-        <!-- ===== SOUND PANEL (bottom right) ===== -->
+        <!-- ===== SOUND PANEL ===== -->
         <div class="sound-panel glass" id="sound-panel">
-            <span class="sound-label">🎵 ASMR</span>
+            <span class="sound-label">🎵 Âm thanh</span>
+
+            <!-- Hàng nhạc nền MP3 -->
+            <div class="bgm-row">
+                <span class="bgm-row-label">Nhạc nền</span>
+                <button id="bgm-toggle-btn" title="Tắt nhạc nền">🌌 Vũ Trụ</button>
+            </div>
+
+            <div class="sound-divider"></div>
+
+            <!-- Hàng ASMR (giữ nguyên) -->
             <div class="sound-btns">
                 <button class="sound-btn active" data-sound="rain" title="Tiếng mưa">🌧 Mưa</button>
                 <button class="sound-btn" data-sound="wave" title="Sóng biển">🌊 Sóng</button>
@@ -132,7 +190,7 @@
             </div>
         </div>
 
-        <!-- ===== MISSIONS PANEL (side) ===== -->
+        <!-- ===== MISSIONS PANEL ===== -->
         <div class="side-panel glass hidden" id="missions-panel">
             <div class="panel-header">
                 <h3>🎯 Nhiệm vụ Săn Sao</h3>
@@ -145,7 +203,7 @@
             </div>
         </div>
 
-        <!-- ===== STORE PANEL (side) ===== -->
+        <!-- ===== STORE PANEL ===== -->
         <div class="side-panel glass hidden" id="store-panel">
             <div class="panel-header">
                 <h3>✦ Star Store</h3>
@@ -203,17 +261,15 @@
             </div>
         </div>
 
-        <!-- Legacy telescope (hidden, kept for JS compatibility) -->
+        <!-- Legacy telescope -->
         <div class="telescope-area hidden" id="telescope-area">
             <div class="telescope-icon" id="telescope-icon"><span>🔭</span></div>
             <div class="input-panel glass hidden" id="input-panel"></div>
         </div>
     </div>
 
-    <!-- ===== HEAL PANEL (side) ===== -->
-    <div class="side-panel glass hidden" id="heal-panel">
-        <!-- nội dung được render động bởi UI._renderHealPanel() -->
-    </div>
+    <!-- ===== HEAL PANEL ===== -->
+    <div class="side-panel glass hidden" id="heal-panel"></div>
 
     <!-- SCRIPTS -->
     <script src="js/config.js"></script>
