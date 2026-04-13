@@ -1,13 +1,7 @@
 /* ================================================
    TRẠM GỬI TÍN HIỆU - missions.js (FULL v3)
-   Hố Đen nâng cấp:
-     - Whoosh hút khi đang giữ
-     - Phóng to + glow tăng dần theo tiến trình
-     - Hút sao tối vào khi hoàn thành
-     - Hiệu ứng RANDOM sau mỗi lần xả (ripple / light burst / energy)
-     - Badge tên hiệu ứng ngẫu nhiên
-     - Âm thanh riêng theo từng effect (playVoidEffect)
-     - HealToast câu an ủi riêng cho hố đen
+   + NotifSystem: ghi lịch sử khi hoàn thành nhiệm vụ,
+     điểm danh streak, và void release
    ================================================ */
 
 const Missions = (() => {
@@ -148,6 +142,10 @@ const Missions = (() => {
         UI.showToast(`✅ ${m.name} hoàn thành! +${m.reward} ✨`);
         setTimeout(() => UI.showHealingQuote(), 1200);
         _updateBar(id, m.max || 1, m.max || 1);
+
+        // Ghi nhận vào lịch sử Tinh Tú
+        NotifSystem.add('bonus', `+${m.reward}`, `Hoàn thành: ${m.name}`);
+
         const item = document.getElementById(`mission-${id}`);
         if (item) {
             item.classList.add('done', 'just-done');
@@ -231,7 +229,7 @@ const Missions = (() => {
     }
 
     /* ================================================
-       HỐ ĐEN — RANDOM EFFECTS SAU KHI XẢ
+       HỐ ĐEN — RANDOM EFFECTS
        ================================================ */
 
     const VOID_RANDOM_EFFECTS = [
@@ -240,7 +238,6 @@ const Missions = (() => {
             label: '✦ Vũ trụ mở rộng',
             soundType: 'stardust',
             run(voidEl) {
-                /* Vòng ripple lan rộng ra từ hố đen */
                 const r = voidEl.getBoundingClientRect();
                 const cx = r.left + r.width / 2;
                 const cy = r.top + r.height / 2;
@@ -268,7 +265,6 @@ const Missions = (() => {
             label: '✦ Ánh sáng giải phóng',
             soundType: 'light',
             run(voidEl) {
-                /* Flash trắng bùng sáng rồi tắt */
                 const flash = document.createElement('div');
                 flash.style.cssText = `
                     position:fixed; inset:0; z-index:998;
@@ -280,7 +276,6 @@ const Missions = (() => {
                 document.body.appendChild(flash);
                 setTimeout(() => flash.remove(), 1300);
 
-                /* Glow trắng trên void */
                 voidEl.style.transition = 'box-shadow 0.25s ease';
                 voidEl.style.boxShadow = '0 0 120px rgba(255,220,255,0.55), 0 0 60px rgba(206,147,216,0.6)';
                 setTimeout(() => { voidEl.style.boxShadow = ''; }, 900);
@@ -291,7 +286,6 @@ const Missions = (() => {
             label: '✦ Năng lượng tái sinh',
             soundType: 'energy',
             run(voidEl) {
-                /* Hạt bụi màu xanh tím bắn ra từ hố đen */
                 const r = voidEl.getBoundingClientRect();
                 const cx = r.left + r.width / 2;
                 const cy = r.top + r.height / 2;
@@ -321,7 +315,6 @@ const Missions = (() => {
             label: '✦ Tinh vân thức tỉnh',
             soundType: 'nebula',
             run(voidEl) {
-                /* Vòng xoay màu dải ngân hà quanh hố đen */
                 const r = voidEl.getBoundingClientRect();
                 const el = document.createElement('div');
                 el.style.cssText = `
@@ -338,7 +331,6 @@ const Missions = (() => {
                 document.body.appendChild(el);
                 setTimeout(() => el.remove(), 1600);
 
-                /* Thêm hạt sáng nhỏ quanh vòng */
                 for (let i = 0; i < 12; i++) {
                     setTimeout(() => {
                         const p = document.createElement('div');
@@ -463,12 +455,10 @@ const Missions = (() => {
             timerEl.classList.remove('hidden');
             startTime = Date.now();
 
-            /* Phóng to nhẹ + glow khi bắt đầu giữ */
             voidEl.style.transition = 'transform 0.5s ease, box-shadow 0.5s ease';
             voidEl.style.transform = 'scale(1.15)';
             voidEl.style.boxShadow = '0 0 80px rgba(206,147,216,0.6), 0 0 140px rgba(150,50,255,0.3)';
 
-            /* Whoosh hút */
             if (typeof Sound !== 'undefined') Sound.startVoidWhoosh();
 
             voidHoldTimer = setInterval(() => {
@@ -477,7 +467,6 @@ const Missions = (() => {
                 countEl.textContent = Math.ceil(remaining);
                 progressEl.style.strokeDashoffset = Math.max(0, CIRC * (1 - elapsed / 10));
 
-                /* Phóng to dần trong quá trình giữ */
                 const scale = 1.15 + (elapsed / 10) * 0.3;
                 voidEl.style.transform = `scale(${scale})`;
                 const glow = Math.floor(80 + (elapsed / 10) * 80);
@@ -489,27 +478,24 @@ const Missions = (() => {
                     isHolding = false;
                     timerEl.classList.add('hidden');
 
-                    /* Hút sao tối → reset + effect ngẫu nhiên + heal toast */
                     _voidSuckStars(voidEl, () => {
                         voidEl.style.transition = 'transform 1s ease, box-shadow 1s ease';
                         voidEl.style.transform = 'scale(1)';
                         voidEl.style.boxShadow = '';
 
-                        /* Dừng whoosh */
                         if (typeof Sound !== 'undefined') Sound.stopVoidWhoosh();
 
-                        /* Flash animation */
                         voidEl.style.animation = 'voidFlash 0.5s ease';
                         setTimeout(() => { voidEl.style.animation = ''; }, 600);
 
-                        /* Hiệu ứng ngẫu nhiên */
                         setTimeout(() => _triggerRandomEffect(voidEl), 200);
 
-                        /* Âm thanh thiền release */
                         if (typeof Sound !== 'undefined') Sound.playVoidRelease();
 
-                        /* Heal toast riêng cho hố đen */
                         setTimeout(() => _showVoidHealToast(), 900);
+
+                        // Dispatch event để app.js hook bắt và ghi NotifSystem
+                        document.dispatchEvent(new CustomEvent('void:released'));
 
                         complete('void_hold');
                         _spawnAbsorbText();
@@ -653,11 +639,17 @@ const Missions = (() => {
         const reward = _getStreakReward(len);
         STATE.points = (parseInt(STATE.points) || 0) + reward;
         Auth.saveState(); UI.updateHUD();
+
+        // Ghi nhận vào lịch sử Tinh Tú
+        NotifSystem.add('bonus', `+${reward}`, `Điểm danh ngày ${len} ✅`);
+
         _spawnStreakStars();
         if (typeof Sound !== 'undefined') Sound.playSinewave(528);
+
         if (len === 7) UI.showToast(`🏅 7 ngày liên tiếp! +${reward} ✨ Danh hiệu "Người giữ lửa Trạm"!`, 5000);
         else if (len >= 4) UI.showToast(`🔥 Streak ${len} ngày! +${reward} ✨`, 4000);
         else UI.showToast(`⭐ Điểm danh ngày ${len}! +${reward} ✨`, 3500);
+
         _syncPointsToServer(reward);
         _syncStreakToServer(STATE.streak);
         setTimeout(() => _renderStreak(), 50);
@@ -667,7 +659,8 @@ const Missions = (() => {
         const el = document.getElementById('streak-mini');
         if (!el) { _spawnDustParticles(); return; }
         const rect = el.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
         for (let i = 0; i < 16; i++) {
             setTimeout(() => {
                 const p = document.createElement('div');

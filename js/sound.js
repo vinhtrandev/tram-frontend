@@ -1,5 +1,5 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - sound.js (FULL v3)
+   TRẠM GỬI TÍN HIỆU - sound.js (FULL v3 - FIXED)
    Web Audio API: ambient sounds + sinewave tones
    + Background Music từ file MP3
    + playVoidEffect(type) — âm thanh riêng cho từng hiệu ứng ngẫu nhiên
@@ -42,23 +42,29 @@ const Sound = (() => {
             bgmAudio.volume = 0;
         }
 
-        bgmAudio.play().then(() => {
-            bgmActive = true;
-            _fadeVolume(bgmAudio, 0, 0.3, 1500);
-            _updateBGMBtn(true);
-        }).catch(() => {
-            document.addEventListener('click', _retryBGM, { once: true });
-        });
-    }
+        const tryPlay = () => {
+            bgmAudio.play().then(() => {
+                bgmActive = true;
+                _fadeVolume(bgmAudio, 0, 0.3, 1500);
+                _updateBGMBtn(true);
+            }).catch(() => { });
+        };
 
-    function _retryBGM() {
-        if (bgmActive) return;
-        if (!bgmAudio) return;
-        bgmAudio.play().then(() => {
-            bgmActive = true;
-            _fadeVolume(bgmAudio, 0, 0.3, 1500);
-            _updateBGMBtn(true);
-        }).catch(() => { });
+        tryPlay();
+
+        // Nếu autoplay bị chặn, thử lại ở lần tương tác đầu tiên
+        if (!bgmActive) {
+            const retry = () => {
+                if (bgmActive) return;
+                tryPlay();
+                document.removeEventListener('click', retry);
+                document.removeEventListener('keydown', retry);
+                document.removeEventListener('touchstart', retry);
+            };
+            document.addEventListener('click', retry);
+            document.addEventListener('keydown', retry);
+            document.addEventListener('touchstart', retry);
+        }
     }
 
     function stopBGM(onDone) {
@@ -67,7 +73,7 @@ const Sound = (() => {
             return;
         }
         bgmActive = false;
-        _fadeVolume(bgmAudio, bgmAudio.volume, 0, 800, () => {
+        _fadeVolume(bgmAudio, bgmAudio.volume, 0, 150, () => {
             bgmAudio.pause();
             bgmAudio.currentTime = 0;
             _updateBGMBtn(false);
@@ -105,7 +111,6 @@ const Sound = (() => {
        HỐ ĐEN — VOID SOUNDS
     ============================================================ */
 
-    /* Whoosh hút: tiếng ào ào khi đang giữ hố đen, tăng dần */
     function startVoidWhoosh() {
         try {
             const c = _getCtx();
@@ -155,7 +160,6 @@ const Sound = (() => {
         _voidWhooshGain = null;
     }
 
-    /* Âm thanh thiền sau khi xả xong — sóng 396Hz + reverb sâu */
     function playVoidRelease() {
         stopVoidWhoosh();
         try {
@@ -175,7 +179,6 @@ const Sound = (() => {
             rev.connect(revGain);
             revGain.connect(c.destination);
 
-            /* 3 tầng sóng: 396Hz (giải phóng), 528Hz (chữa lành), 174Hz (nền sâu) */
             const layers = [
                 { freq: 174, gain: 0.12, decay: 4.5, delay: 0 },
                 { freq: 396, gain: 0.20, decay: 3.8, delay: 0.1 },
@@ -197,7 +200,6 @@ const Sound = (() => {
                 osc.stop(now + delay + decay + 0.2);
             });
 
-            /* Whoosh thoát ra — tiếng ào tắt dần */
             const noiseBuf = c.createBuffer(1, c.sampleRate * 1.5, c.sampleRate);
             const nd = noiseBuf.getChannelData(0);
             for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -220,15 +222,13 @@ const Sound = (() => {
     }
 
     /* ============================================================
-       playVoidEffect(type) — âm thanh riêng cho từng random effect
-       type: 'stardust' | 'light' | 'energy' | 'nebula'
+       playVoidEffect(type)
     ============================================================ */
     function playVoidEffect(type) {
         try {
             const c = _getCtx();
             const now = c.currentTime;
 
-            /* Reverb chung — nhỏ hơn playVoidRelease để không đè */
             const rvBuf = c.createBuffer(2, c.sampleRate * 2.5, c.sampleRate);
             [0, 1].forEach(ch => {
                 const d = rvBuf.getChannelData(ch);
@@ -243,26 +243,22 @@ const Sound = (() => {
             revGain.connect(c.destination);
 
             const presets = {
-                /* Vũ trụ mở rộng — Solfeggio 741Hz (thức tỉnh) + 852Hz (tâm linh) */
                 stardust: [
                     { freq: 741, gain: 0.10, decay: 2.2, delay: 0, type: 'sine' },
                     { freq: 852, gain: 0.07, decay: 1.8, delay: 0.15, type: 'sine' },
                     { freq: 1480, gain: 0.03, decay: 1.2, delay: 0.3, type: 'sine' },
                 ],
-                /* Ánh sáng giải phóng — arpeggio sáng, nhanh */
                 light: [
                     { freq: 528, gain: 0.13, decay: 1.5, delay: 0, type: 'sine' },
                     { freq: 660, gain: 0.10, decay: 1.3, delay: 0.08, type: 'sine' },
                     { freq: 792, gain: 0.08, decay: 1.1, delay: 0.16, type: 'sine' },
                     { freq: 1056, gain: 0.05, decay: 0.9, delay: 0.24, type: 'sine' },
                 ],
-                /* Năng lượng tái sinh — 285Hz (tái tạo tế bào) + pulse nhẹ */
                 energy: [
                     { freq: 285, gain: 0.15, decay: 3.0, delay: 0, type: 'sine' },
                     { freq: 417, gain: 0.10, decay: 2.5, delay: 0.2, type: 'sine' },
                     { freq: 570, gain: 0.06, decay: 2.0, delay: 0.4, type: 'sine' },
                 ],
-                /* Tinh vân thức tỉnh — pad sâu + overtone */
                 nebula: [
                     { freq: 111, gain: 0.14, decay: 4.0, delay: 0, type: 'sine' },
                     { freq: 222, gain: 0.08, decay: 3.5, delay: 0.1, type: 'sine' },
@@ -288,7 +284,6 @@ const Sound = (() => {
                 osc.stop(now + delay + decay + 0.15);
             });
 
-            /* Thêm tiếng "ping" nhỏ cho stardust và light */
             if (type === 'stardust' || type === 'light') {
                 const ping = c.createOscillator();
                 const pingEnv = c.createGain();
@@ -369,8 +364,8 @@ const Sound = (() => {
     function playAmbient(type) {
         if (type === 'off') {
             _stopAmbient();
+            stopBGM();
             STATE.currentSound = 'off';
-            startBGM();
             return;
         }
 
@@ -524,6 +519,8 @@ const Sound = (() => {
                             type === 'wave' ? '🌊 Sóng biển đêm' :
                                 '🔔 Chuông gió ngân xa', 2000
                     );
+                } else {
+                    UI.showToast('🔇 Đã tắt âm thanh', 2000);
                 }
             });
         });
@@ -537,13 +534,14 @@ const Sound = (() => {
             bgmBtn.addEventListener('click', () => {
                 if (bgmActive) {
                     stopBGM();
+                    UI.showToast('🔇 Nhạc nền đã tắt', 2000);
                 } else {
                     _stopAmbient();
                     document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
                     STATE.currentSound = 'off';
                     startBGM();
+                    UI.showToast('🎵 Nhạc nền đang phát', 2000);
                 }
-                UI.showToast(bgmActive ? '🎵 Nhạc nền đang phát' : '🔇 Nhạc nền tắt', 2000);
             });
         }
     }

@@ -2,10 +2,9 @@
    TRẠM GỬI TÍN HIỆU - stars.js (FIXED & HOÀN CHỈNH)
    DOM star dots, signal sending, star popup,
    shooting star event, meteor rain
-   FIX: sendSignal chỉ được gọi khi text hợp lệ
-   (toxic check đã chặn hoàn toàn ở missions.js)
-   → showHeal mặc định true, HealToast chỉ hiện
-     khi text thực sự được gửi lên server
+   + dispatch 'shootingstar:caught' và 'meteorrain:bonus'
+     để app.js hook ghi vào NotifSystem
+   + Hiển thị số lượng tương tác trên ngôi sao
    ================================================ */
 
 const Stars = (() => {
@@ -55,25 +54,72 @@ const Stars = (() => {
 
     /* ---- CREATE DOM STAR ---- */
     function _createDomStar(data) {
+        // Wrapper để chứa cả star dot + badge
+        const wrapper = document.createElement('div');
+        wrapper.className = 'star-wrapper';
+        wrapper.style.cssText = `
+            position: absolute;
+            left: ${data.x}%;
+            top: ${data.y}%;
+            width: 0; height: 0;
+            overflow: visible;
+        `;
+
         const el = document.createElement('div');
         el.className = `star-dot type-${data.type}`;
         el.style.cssText = `
-      left:${data.x}%; top:${data.y}%;
-      width:${data.size}px; height:${data.size}px;
-      opacity:${data.opacity};
-      box-shadow:0 0 ${data.size * 2}px ${data.size}px ${CONFIG.STAR_TYPES[data.type]?.color || '#fff'}55;
-      animation: twinkle ${3 + Math.random() * 4}s ease-in-out infinite;
-      animation-delay:${Math.random() * 4}s;
-    `;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width:${data.size}px; height:${data.size}px;
+            opacity:${data.opacity};
+            box-shadow:0 0 ${data.size * 2}px ${data.size}px ${CONFIG.STAR_TYPES[data.type]?.color || '#fff'}55;
+            animation: twinkle ${3 + Math.random() * 4}s ease-in-out infinite;
+            animation-delay:${Math.random() * 4}s;
+        `;
         if (data.isNegative) el.classList.add('has-react');
         if (data.tailEffect) el.style.boxShadow += `, -${data.size * 8}px 0 ${data.size * 2}px ${CONFIG.STAR_TYPES[data.type]?.color || '#fff'}33`;
 
-        el.addEventListener('click', () => _showPopup(el, data));
+        // Badge ẩn, chỉ dùng để track data — số react hiện trong popup
+        const badge = document.createElement('div');
+        badge.className = 'star-react-badge';
+        badge.style.display = 'none';
+
+        wrapper.appendChild(el);
+        wrapper.appendChild(badge);
+
+        el.addEventListener('click', () => _showPopup(el, data, badge));
         el.addEventListener('mouseenter', () => _showLabel(el, data));
         el.addEventListener('mouseleave', _hideLabel);
 
-        container().appendChild(el);
-        return el;
+        container().appendChild(wrapper);
+        data._badge = badge;
+        data._el = el;
+        return wrapper;
+    }
+
+    function _getTotalReacts(data) {
+        const r = data.reactions || {};
+        return (r.listen || 0) + (r.hug || 0) + (r.strong || 0);
+    }
+
+    function _formatReactBadge(data) {
+        const r = data.reactions || {};
+        const parts = [];
+        if (r.listen) parts.push(`🕯️ ${r.listen}`);
+        if (r.hug) parts.push(`❤️ ${r.hug}`);
+        if (r.strong) parts.push(`⚡ ${r.strong}`);
+        return parts.join('  ');
+    }
+
+    function _updateBadge(data) {
+        if (!data._badge) return;
+        const total = _getTotalReacts(data);
+        if (total > 0) {
+            data._badge.textContent = _formatReactBadge(data);
+            data._badge.style.opacity = '1';
+        } else {
+            data._badge.style.opacity = '0';
+        }
     }
 
     /* ---- LABEL ---- */
@@ -93,10 +139,18 @@ const Stars = (() => {
     }
 
     /* ---- POPUP ---- */
-    function _showPopup(el, data) {
+    function _showPopup(el, data, badge) {
         const popup = document.getElementById('star-popup');
         if (!popup) return;
         document.getElementById('star-popup-text').textContent = data.text;
+
+        // Hiển thị nickname thay vì Anonymous
+        const anonLabel = popup.querySelector('.anon-label');
+        if (anonLabel) {
+            anonLabel.textContent = (data.nickname && data.nickname !== 'Ẩn danh')
+                ? `${data.nickname} ✦`
+                : 'Ẩn danh ✦';
+        }
 
         const rect = el.getBoundingClientRect();
         const pw = 280, ph = 180;
@@ -107,17 +161,72 @@ const Stars = (() => {
         popup.style.cssText = `left:${left}px; top:${top}px; display:block;`;
         popup.classList.remove('hidden');
 
+        // Render số react hiện tại trong popup
+        _renderPopupReacts(data);
+
         popup.querySelectorAll('.react-btn').forEach(btn => {
             btn.onclick = () => {
-                _sendReaction(data.id, btn.dataset.reaction, el);
+                const reaction = btn.dataset.reaction;
+
+                // Cập nhật local
+                if (!data.reactions) data.reactions = {};
+                data.reactions[reaction] = (data.reactions[reaction] || 0) + 1;
+                _updateBadge(data);
+
+                // Hiệu ứng glow trên ngôi sao
+                el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
+                setTimeout(() => { el.style.boxShadow = ''; }, 1200);
+
+                _sendReaction(data.id, reaction, el);
                 popup.classList.add('hidden');
                 if (data.isNegative) Missions.progress('light_hope', 1);
-                UI.showToast('Đã gửi cảm xúc của bạn 💫');
+
+                const labels = { listen: 'Lắng nghe 🕯️', hug: 'Cái ôm ❤️', strong: 'Mạnh mẽ ⚡' };
+                UI.showToast(`Đã gửi: ${labels[reaction] || '💫'}`);
             };
         });
 
         STATE.starsRead = (parseInt(STATE.starsRead) || 0) + 1;
         Missions.progress('read_stars', STATE.starsRead);
+    }
+
+    function _renderPopupReacts(data) {
+        const r = data.reactions || {};
+        const total = (r.listen || 0) + (r.hug || 0) + (r.strong || 0);
+
+        // Xoá summary cũ nếu có
+        const popup = document.getElementById('star-popup');
+        popup.querySelectorAll('.react-summary').forEach(el => el.remove());
+
+        if (total === 0) return;
+
+        const summary = document.createElement('div');
+        summary.className = 'react-summary';
+        summary.style.cssText = `
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.55);
+            margin-top: 6px;
+            margin-bottom: -4px;
+        `;
+        const items = [
+            { key: 'listen', icon: '🕯️' },
+            { key: 'hug', icon: '❤️' },
+            { key: 'strong', icon: '⚡' },
+        ];
+        items.forEach(({ key, icon }) => {
+            const count = r[key] || 0;
+            if (count === 0) return;
+            const span = document.createElement('span');
+            span.textContent = `${icon} ${count}`;
+            summary.appendChild(span);
+        });
+
+        // Chèn vào trên react-btns
+        const reactBtns = popup.querySelector('.reaction-btns');
+        if (reactBtns) popup.insertBefore(summary, reactBtns);
     }
 
     async function _sendReaction(starId, type, el) {
@@ -131,8 +240,6 @@ const Stars = (() => {
                 },
                 body: JSON.stringify({ type })
             });
-            el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
-            setTimeout(() => { el.style.boxShadow = ''; }, 1200);
             await _syncPointsFromServer();
             UI.updateHUD();
         } catch { }
@@ -156,6 +263,12 @@ const Stars = (() => {
                 if (!s.size) s.size = 3 + Math.random() * 5;
                 if (!s.opacity) s.opacity = 0.5 + Math.random() * 0.5;
                 if (!CONFIG.STAR_TYPES[s.type]) s.type = 'normal';
+                // Map listenCount/hugCount/strongCount → reactions object
+                s.reactions = {
+                    listen: s.listenCount || 0,
+                    hug: s.hugCount || 0,
+                    strong: s.strongCount || 0,
+                };
                 const el = _createDomStar(s);
                 domStars.push({ el, data: s });
             });
@@ -169,22 +282,22 @@ const Stars = (() => {
         domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
         domStars = [];
         const demos = [
-            { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'normal', isNegative: true },
-            { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'bright', isNegative: false },
-            { id: 3, text: 'Tiếng mưa buổi sáng thật bình yên 🌧️', type: 'shooting', isNegative: false },
-            { id: 4, text: 'Muốn được ngủ đủ giấc một lần thôi...', type: 'normal', isNegative: true },
-            { id: 5, text: 'Bầu trời đêm nay đẹp không ai ơi 🌙', type: 'bright', isNegative: false },
-            { id: 6, text: 'Nhớ nhà quá, xa nhà được 3 tháng rồi', type: 'normal', isNegative: true },
-            { id: 7, text: 'Cuối cùng cũng hoàn thành project ✨', type: 'shooting', isNegative: false },
-            { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'normal', isNegative: true },
-            { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'bright', isNegative: false },
-            { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'normal', isNegative: false },
+            { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'normal', isNegative: true, reactions: { listen: 3, hug: 1 } },
+            { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'bright', isNegative: false, reactions: { strong: 2 } },
+            { id: 3, text: 'Tiếng mưa buổi sáng thật bình yên 🌧️', type: 'shooting', isNegative: false, reactions: {} },
+            { id: 4, text: 'Muốn được ngủ đủ giấc một lần thôi...', type: 'normal', isNegative: true, reactions: { hug: 5 } },
+            { id: 5, text: 'Bầu trời đêm nay đẹp không ai ơi 🌙', type: 'bright', isNegative: false, reactions: {} },
+            { id: 6, text: 'Nhớ nhà quá, xa nhà được 3 tháng rồi', type: 'normal', isNegative: true, reactions: { listen: 2, hug: 4 } },
+            { id: 7, text: 'Cuối cùng cũng hoàn thành project ✨', type: 'shooting', isNegative: false, reactions: { strong: 7 } },
+            { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'normal', isNegative: true, reactions: { listen: 1 } },
+            { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'bright', isNegative: false, reactions: {} },
+            { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'normal', isNegative: false, reactions: { hug: 12, listen: 3 } },
         ];
         demos.forEach(d => {
-            const x = 5 + Math.random() * 88;
-            const y = 5 + Math.random() * 65;
-            const size = 3 + Math.random() * 5;
-            const s = { ...d, x, y, size, opacity: 0.6 + Math.random() * 0.4 };
+            const s = {
+                ...d, x: 5 + Math.random() * 88, y: 5 + Math.random() * 65,
+                size: 3 + Math.random() * 5, opacity: 0.6 + Math.random() * 0.4
+            };
             const el = _createDomStar(s);
             domStars.push({ el, data: s });
         });
@@ -192,18 +305,11 @@ const Stars = (() => {
 
     /* ================================================================
        SEND SIGNAL
-       - Hàm này CHỈ được gọi khi text đã vượt qua validation ở missions.js
-       - showHeal=true: hiện HealToast sau khi gửi thành công
-       - Không cần kiểm tra toxic ở đây nữa vì missions.js đã chặn trước
        ================================================================ */
     async function sendSignal(text, type, showHeal = true) {
-        // Guard cuối: nếu text rỗng thì bỏ qua (không bao giờ xảy ra nếu missions.js đúng)
         if (!text || !text.trim()) return;
 
-        // ① Tiếng chuông
         if (typeof Sound !== 'undefined') Sound.playBell();
-
-        // ② HealToast - chỉ hiện khi showHeal=true (tức là text hợp lệ)
         if (showHeal && typeof HealToast !== 'undefined') HealToast.show();
 
         const validType = CONFIG.STAR_TYPES[type] ? type : 'normal';
@@ -214,11 +320,11 @@ const Stars = (() => {
         const hasTrail = STATE.unlocked && !!STATE.unlocked['trail_star'];
         const hasHalo = STATE.unlocked && !!STATE.unlocked['halo_star'];
 
-        // ③ Particle bay lên rồi đặt sao
         _animateSignalFly(x, y, async () => {
             const data = {
                 id: null, text, type: validType, x, y, size: starSize, opacity: 0.85,
-                isNegative: _isNegative(text), tailEffect: hasTrail, haloEffect: hasHalo
+                isNegative: _isNegative(text), tailEffect: hasTrail, haloEffect: hasHalo,
+                reactions: {}
             };
             const id = await _postStar(text, validType, x, y);
             if (id) data.id = id;
@@ -262,7 +368,7 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       SHOOTING STAR - cố định 60 giây / lần
+       SHOOTING STAR
        ================================================================ */
     function _isShootingStarDone() {
         return !!(STATE.dailyMissions && STATE.dailyMissions['shooting_star_done']);
@@ -302,10 +408,8 @@ const Stars = (() => {
 
         const tail = document.createElement('div');
         tail.className = 'shooting-star-tail';
-
         const glow = document.createElement('div');
         glow.className = 'shooting-star-glow';
-
         const head = document.createElement('div');
         head.className = 'shooting-star-head';
         head.style.pointerEvents = 'all';
@@ -342,6 +446,8 @@ const Stars = (() => {
             UI.showToast(`🌠 Bạn đã bắt được sao băng! +${CONFIG.POINTS.SHOOTING_STAR} ✨`);
             if (typeof Sound !== 'undefined') Sound.playSinewave(880);
             UI.updateHUD();
+
+            document.dispatchEvent(new CustomEvent('shootingstar:caught'));
         };
 
         head.addEventListener('click', catchMeteor);
@@ -397,6 +503,8 @@ const Stars = (() => {
         UI.addPoints(30);
         await _pushPointsToServer(30);
         UI.updateHUD();
+
+        document.dispatchEvent(new CustomEvent('meteorrain:bonus'));
 
         const screen = document.getElementById('main-screen');
         if (!screen) return;

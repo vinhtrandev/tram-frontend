@@ -1,9 +1,169 @@
 /* ================================================
    TRẠM GỬI TÍN HIỆU - ui.js
    UI helpers: toast, points, panels, typewriter,
-   healing quotes, panel toggles
+   healing quotes, panel toggles + NotifSystem
    ================================================ */
 
+/* ============================================================
+   NOTIFICATION / TRANSACTION HISTORY SYSTEM
+   ============================================================ */
+const NotifSystem = (() => {
+    const STORAGE_KEY = 'tinh_tu_history';
+    const MAX_ITEMS = 50;
+
+    let transactions = [];
+    let unread = 0;
+
+    let panel, bellBtn, badge, list, emptyEl,
+        earnedEl, spentEl, balanceEl, clearBtn, closeBtn;
+
+    function save() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); } catch (e) { }
+    }
+
+    function load() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            transactions = raw ? JSON.parse(raw) : [];
+        } catch (e) { transactions = []; }
+    }
+
+    function formatTime(iso) {
+        const d = new Date(iso);
+        const diffMin = Math.floor((Date.now() - d) / 60000);
+        if (diffMin < 1) return 'Vừa xong';
+        if (diffMin < 60) return `${diffMin} phút trước`;
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return `${diffH} giờ trước`;
+        const diffD = Math.floor(diffH / 24);
+        if (diffD < 7) return `${diffD} ngày trước`;
+        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+    }
+
+    function typeIcon(type) {
+        return { earn: '✨', spend: '🎁', bonus: '⭐' }[type] || '💫';
+    }
+
+    function renderSummary() {
+        const earned = transactions
+            .filter(t => t.type === 'earn' || t.type === 'bonus')
+            .reduce((s, t) => s + Math.abs(t.amountNum), 0);
+        const spent = transactions
+            .filter(t => t.type === 'spend')
+            .reduce((s, t) => s + Math.abs(t.amountNum), 0);
+        const navPts = document.getElementById('user-points');
+        const balance = navPts ? (parseInt(navPts.textContent) || 0) : (earned - spent);
+
+        if (earnedEl) earnedEl.textContent = earned;
+        if (spentEl) spentEl.textContent = spent;
+        if (balanceEl) balanceEl.textContent = balance;
+    }
+
+    function renderList() {
+        if (!list) return;
+        [...list.querySelectorAll('.notif-item')].forEach(el => el.remove());
+
+        if (transactions.length === 0) {
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        [...transactions].reverse().forEach(tx => {
+            const item = document.createElement('div');
+            item.className = `notif-item type-${tx.type}`;
+            item.innerHTML = `
+                <div class="notif-item-icon">${typeIcon(tx.type)}</div>
+                <div class="notif-item-body">
+                    <div class="notif-item-desc" title="${tx.desc}">${tx.desc}</div>
+                    <div class="notif-item-time">${formatTime(tx.time)}</div>
+                </div>
+                <div class="notif-item-amount">${tx.amount} ✨</div>
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function updateBadge() {
+        if (!badge) return;
+        if (unread > 0) {
+            badge.textContent = unread > 99 ? '99+' : unread;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    function toggle() {
+        if (!panel) return;
+        const isHidden = panel.classList.contains('hidden');
+        if (isHidden) {
+            document.getElementById('missions-panel')?.classList.add('hidden');
+            document.getElementById('store-panel')?.classList.add('hidden');
+            document.getElementById('heal-panel')?.classList.add('hidden');
+            panel.classList.remove('hidden');
+            unread = 0;
+            updateBadge();
+            renderSummary();
+            renderList();
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+
+    function add(type, amount, desc) {
+        const amountNum = parseInt(String(amount).replace(/[^0-9-]/g, '')) || 0;
+        const tx = { type, amount: String(amount), amountNum, desc, time: new Date().toISOString() };
+        transactions.push(tx);
+        if (transactions.length > MAX_ITEMS) transactions.splice(0, transactions.length - MAX_ITEMS);
+        save();
+        unread++;
+        updateBadge();
+        if (panel && !panel.classList.contains('hidden')) {
+            renderSummary();
+            renderList();
+        }
+    }
+
+    function init() {
+        panel = document.getElementById('notif-panel');
+        bellBtn = document.getElementById('nav-bell-btn');
+        badge = document.getElementById('bell-badge');
+        list = document.getElementById('notif-list');
+        emptyEl = document.getElementById('notif-empty');
+        earnedEl = document.getElementById('total-earned-display');
+        spentEl = document.getElementById('total-spent-display');
+        balanceEl = document.getElementById('balance-display');
+        clearBtn = document.getElementById('notif-clear-btn');
+        closeBtn = document.getElementById('close-notif');
+
+        load();
+
+        bellBtn?.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+        closeBtn?.addEventListener('click', () => panel?.classList.add('hidden'));
+        clearBtn?.addEventListener('click', () => {
+            if (confirm('Xoá toàn bộ lịch sử giao dịch?')) {
+                transactions = [];
+                save();
+                renderSummary();
+                renderList();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (panel && !panel.contains(e.target) && e.target !== bellBtn) {
+                panel.classList.add('hidden');
+            }
+        });
+    }
+
+    return { init, add };
+})();
+
+
+/* ============================================================
+   UI MODULE
+   ============================================================ */
 const UI = (() => {
 
     /* ---------- TOAST ---------- */
@@ -17,16 +177,26 @@ const UI = (() => {
     }
 
     /* ---------- POINTS ---------- */
-    function addPoints(amount) {
+    function addPoints(amount, desc) {
         STATE.points = Math.max(0, STATE.points + amount);
         document.getElementById('user-points').textContent = STATE.points;
 
         if (amount > 0) {
             _showPointGain(amount);
-            Auth.saveState();
-        } else {
-            Auth.saveState();
+            if (desc) NotifSystem.add('earn', `+${amount}`, desc);
+        } else if (amount < 0) {
+            if (desc) NotifSystem.add('spend', `${amount}`, desc);
         }
+        Auth.saveState();
+    }
+
+    /* addBonus: phân biệt nhiệm vụ / streak / bonus đặc biệt */
+    function addBonus(amount, desc) {
+        STATE.points = Math.max(0, STATE.points + amount);
+        document.getElementById('user-points').textContent = STATE.points;
+        _showPointGain(amount);
+        if (desc) NotifSystem.add('bonus', `+${amount}`, desc);
+        Auth.saveState();
     }
 
     function _showPointGain(amount) {
@@ -126,7 +296,6 @@ const UI = (() => {
         });
 
         document.getElementById('btn-new-quote')?.addEventListener('click', () => {
-            // Chọn câu khác, không trùng câu hiện tại
             let next;
             do { next = Math.floor(Math.random() * CONFIG.QUOTES.length); }
             while (next === _healIndex && CONFIG.QUOTES.length > 1);
@@ -166,6 +335,7 @@ const UI = (() => {
                 togglePanel('missions-panel');
                 document.getElementById('store-panel')?.classList.add('hidden');
                 document.getElementById('heal-panel')?.classList.add('hidden');
+                document.getElementById('notif-panel')?.classList.add('hidden');
             });
         }
 
@@ -180,6 +350,7 @@ const UI = (() => {
                 togglePanel('store-panel');
                 document.getElementById('missions-panel')?.classList.add('hidden');
                 document.getElementById('heal-panel')?.classList.add('hidden');
+                document.getElementById('notif-panel')?.classList.add('hidden');
                 Store?.init?.();
             });
         }
@@ -190,11 +361,11 @@ const UI = (() => {
             });
         }
 
-        // ✅ Handler Chữa Lành
         if (btnHeal) {
             btnHeal.addEventListener('click', () => {
                 document.getElementById('missions-panel')?.classList.add('hidden');
                 document.getElementById('store-panel')?.classList.add('hidden');
+                document.getElementById('notif-panel')?.classList.add('hidden');
                 const panel = document.getElementById('heal-panel');
                 if (panel) {
                     panel.classList.toggle('hidden');
@@ -211,6 +382,9 @@ const UI = (() => {
                 }
             });
         }
+
+        // Khởi động NotifSystem sau khi DOM sẵn sàng
+        NotifSystem.init();
     }
 
     function togglePanel(id) {
@@ -238,6 +412,7 @@ const UI = (() => {
     return {
         showToast,
         addPoints,
+        addBonus,
         typewriter,
         initLandingText,
         startRandomQuotes,
