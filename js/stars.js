@@ -1,9 +1,7 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - stars.js
-   DOM star dots, signal sending, star popup,
-   shooting star event, meteor rain
-   + 3 loại sao mới: shooting / north / cluster
-   + fly animation riêng cho từng loại
+   TRẠM GỬI TÍN HIỆU - stars.js (FULL v3)
+   + Hiện tên mình / Ẩn danh cho người khác
+   + Lưu createdAt đúng lúc gửi → hiện giờ gửi
    ================================================ */
 
 const Stars = (() => {
@@ -52,7 +50,7 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       CREATE DOM STAR - theo từng type
+       CREATE DOM STAR
        ================================================================ */
     function _createDomStar(data) {
         const wrapper = document.createElement('div');
@@ -107,7 +105,6 @@ const Stars = (() => {
                 el.appendChild(sub);
             });
         } else {
-            // shooting
             const s = data.size || 4;
             el.style.cssText = `
                 position: absolute;
@@ -140,7 +137,6 @@ const Stars = (() => {
         data._badge = badge;
         data._el = el;
 
-        // TTL: chỉ set nếu có ttl VÀ không permanent
         const typeConf = CONFIG.STAR_TYPES[data.type];
         if (typeConf && typeConf.ttl && !typeConf.permanent) {
             const ttlMs = typeConf.ttl;
@@ -200,86 +196,175 @@ const Stars = (() => {
         if (labelEl) { labelEl.remove(); labelEl = null; }
     }
 
-    /* ---- POPUP ---- */
+    /* ================================================================
+       FORMAT THỜI GIAN — hiện "Vừa xong" nếu < 1 phút
+       ================================================================ */
+    function _formatTime(isoString) {
+        if (!isoString) return null;
+        const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+        if (diff < 60) return 'Vừa xong';
+        if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+        return `${Math.floor(diff / 86400)} ngày trước`;
+    }
+
+    /* ================================================================
+       POPUP — hiện tên mình, ẩn danh cho người khác
+       ================================================================ */
     function _showPopup(el, data, badge) {
         const popup = document.getElementById('star-popup');
-        if (!popup) return;
-        document.getElementById('star-popup-text').textContent = data.text;
+        const textEl = document.getElementById('star-popup-text');
+        const userEl = document.getElementById('popup-username');
+        const timeEl = document.getElementById('popup-time');
+        const moodTag = document.getElementById('popup-mood-tag');
+        const cntListen = document.getElementById('count-listen');
+        const cntHug = document.getElementById('count-hug');
+        const cntStrong = document.getElementById('count-strong');
+        if (!popup || !textEl) return;
 
-        // ── Chỉ hiển thị tên thật nếu ngôi sao là của chính người dùng hiện tại ──
-        const anonLabel = popup.querySelector('.anon-label');
-        if (anonLabel) {
-            const currentNickname = STATE.user?.nickname || STATE.user?.username || '';
-            const starOwner = data.nickname || '';
-            const isOwner = currentNickname &&
-                starOwner &&
-                currentNickname.toLowerCase() === starOwner.toLowerCase();
+        // ── Nội dung ──
+        textEl.textContent = data.text || '';
 
-            anonLabel.textContent = isOwner
-                ? `${starOwner} ✦`   // chủ sao: thấy tên mình
-                : 'Ẩn danh ✦';       // người khác: luôn ẩn danh
+        // ── Tên: hiện tên mình, Ẩn danh cho người khác ──
+        if (userEl) {
+            const myNickname = STATE.user?.nickname || STATE.user?.username;
+            const myId = STATE.user?.id;
+
+            const isOwn =
+                (myId && data.userId && String(data.userId) === String(myId)) ||
+                (myNickname && data.nickname && data.nickname !== 'Ẩn danh' && data.nickname === myNickname);
+
+            userEl.textContent = isOwn ? `${myNickname} ✦` : 'Ẩn danh ✦';
         }
 
-        const rect = el.getBoundingClientRect();
-        const pw = 280, ph = 180;
-        let left = rect.left - pw / 2;
-        let top = rect.top - ph - 16;
-        left = Math.max(8, Math.min(left, window.innerWidth - pw - 8));
-        top = Math.max(70, top);
-        popup.style.cssText = `left:${left}px; top:${top}px; display:block;`;
-        popup.classList.remove('hidden');
+        // ── Thời gian: luôn hiện (kể cả "Vừa xong") ──
+        if (timeEl) {
+            const timeStr = _formatTime(data.createdAt || data.timestamp);
+            if (timeStr) {
+                timeEl.textContent = timeStr;
+                timeEl.style.display = '';
+            } else {
+                timeEl.textContent = '';
+                timeEl.style.display = 'none';
+            }
+        }
 
-        _renderPopupReacts(data);
+        // ── Tag Tâm sự buồn ──
+        if (moodTag) {
+            moodTag.classList.toggle('hidden', !data.isMoodPost);
+        }
 
+        // ── React counts ──
+        const r = data.reactions || {};
+        if (cntListen) {
+            cntListen.textContent = `🕯️ ${r.listen || 0}`;
+            cntListen.classList.toggle('has-reacts', (r.listen || 0) > 0);
+        }
+        if (cntHug) {
+            cntHug.textContent = `❤️ ${r.hug || 0}`;
+            cntHug.classList.toggle('has-reacts', (r.hug || 0) > 0);
+        }
+        if (cntStrong) {
+            cntStrong.textContent = `⚡ ${r.strong || 0}`;
+            cntStrong.classList.toggle('has-reacts', (r.strong || 0) > 0);
+        }
+
+        // ── Reset trạng thái reacted ──
         popup.querySelectorAll('.react-btn').forEach(btn => {
-            btn.onclick = () => {
-                const reaction = btn.dataset.reaction;
-                if (!data.reactions) data.reactions = {};
-                data.reactions[reaction] = (data.reactions[reaction] || 0) + 1;
-                _updateBadge(data);
-
-                el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
-                setTimeout(() => { el.style.boxShadow = ''; }, 1200);
-
-                _sendReaction(data.id, reaction, el);
-                popup.classList.add('hidden');
-                if (data.isNegative) Missions.progress('light_hope', 1);
-
-                const labels = { listen: 'Lắng nghe 🕯️', hug: 'Cái ôm ❤️', strong: 'Mạnh mẽ ⚡' };
-                UI.showToast(`Đã gửi: ${labels[reaction] || '💫'}`);
-            };
+            btn.classList.remove('reacted', 'just-reacted');
         });
 
+        // ── Vị trí popup thông minh ──
+        _positionPopup(popup, el);
+
+        // ── Hiện popup ──
+        popup.classList.remove('hidden');
+
+        // ── Lưu data hiện tại để react buttons dùng ──
+        popup._currentStar = data;
+        popup._currentEl = el;
+
+        // ── Bind react buttons ──
+        _bindReactButtons(popup);
+
+        // ── Tracking ──
         STATE.starsRead = (parseInt(STATE.starsRead) || 0) + 1;
         Missions.progress('read_stars', STATE.starsRead);
     }
 
-    function _renderPopupReacts(data) {
-        const r = data.reactions || {};
-        const total = (r.listen || 0) + (r.hug || 0) + (r.strong || 0);
-        const popup = document.getElementById('star-popup');
-        popup.querySelectorAll('.react-summary').forEach(el => el.remove());
-        if (total === 0) return;
+    function _positionPopup(popup, triggerEl) {
+        popup.style.left = '-9999px';
+        popup.style.top = '-9999px';
+        popup.classList.remove('hidden');
 
-        const summary = document.createElement('div');
-        summary.className = 'react-summary';
-        summary.style.cssText = `
-            display:flex; gap:10px; justify-content:center;
-            font-size:0.72rem; color:rgba(255,255,255,0.55);
-            margin-top:6px; margin-bottom:-4px;
-        `;
-        [{ key: 'listen', icon: '🕯️' }, { key: 'hug', icon: '❤️' }, { key: 'strong', icon: '⚡' }].forEach(({ key, icon }) => {
-            const count = r[key] || 0;
-            if (!count) return;
-            const span = document.createElement('span');
-            span.textContent = `${icon} ${count}`;
-            summary.appendChild(span);
-        });
-        const reactBtns = popup.querySelector('.reaction-btns');
-        if (reactBtns) popup.insertBefore(summary, reactBtns);
+        const rect = triggerEl.getBoundingClientRect();
+        const pw = popup.offsetWidth || 300;
+        const ph = popup.offsetHeight || 280;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const margin = 16;
+
+        let left = rect.left + rect.width / 2 - pw / 2;
+        let top = rect.top - ph - 16;
+
+        if (top < 70) top = rect.bottom + 12;
+        left = Math.max(margin, Math.min(left, vw - pw - margin));
+        top = Math.min(top, vh - ph - margin);
+
+        popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+        popup.classList.add('hidden');
     }
 
-    async function _sendReaction(starId, type, el) {
+    function _bindReactButtons(popup) {
+        popup.querySelectorAll('.react-btn').forEach(btn => {
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+
+            newBtn.addEventListener('click', async () => {
+                const data = popup._currentStar;
+                const el = popup._currentEl;
+                if (!data) return;
+
+                const reaction = newBtn.dataset.reaction;
+
+                const wasReacted = newBtn.classList.contains('reacted');
+                newBtn.classList.toggle('reacted', !wasReacted);
+                newBtn.classList.add('just-reacted');
+                setTimeout(() => newBtn.classList.remove('just-reacted'), 450);
+
+                if (!data.reactions) data.reactions = {};
+                const delta = wasReacted ? -1 : 1;
+                data.reactions[reaction] = Math.max(0, (data.reactions[reaction] || 0) + delta);
+
+                const emojiMap = { listen: '🕯️', hug: '❤️', strong: '⚡' };
+                const countIdMap = { listen: 'count-listen', hug: 'count-hug', strong: 'count-strong' };
+                const countEl = document.getElementById(countIdMap[reaction]);
+                if (countEl) {
+                    countEl.textContent = `${emojiMap[reaction]} ${data.reactions[reaction]}`;
+                    countEl.classList.toggle('has-reacts', data.reactions[reaction] > 0);
+                }
+
+                _updateBadge(data);
+
+                if (el) {
+                    el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
+                    setTimeout(() => { el.style.boxShadow = ''; }, 1200);
+                }
+
+                await _sendReaction(data.id, reaction);
+
+                if (data.isNegative) Missions.progress('light_hope', 1);
+
+                const labels = { listen: 'Lắng nghe 🕯️', hug: 'Cái ôm ❤️', strong: 'Mạnh mẽ ⚡' };
+                UI.showToast(`Đã gửi: ${labels[reaction] || '💫'}`);
+
+                setTimeout(() => popup.classList.add('hidden'), 800);
+            });
+        });
+    }
+
+    async function _sendReaction(starId, type) {
         if (!starId) return;
         try {
             await fetch(`${CONFIG.API_BASE}/stars/${starId}/react`, {
@@ -295,7 +380,9 @@ const Stars = (() => {
         } catch { }
     }
 
-    /* ---- LOAD STARS FROM SERVER ---- */
+    /* ================================================================
+       LOAD STARS FROM SERVER
+       ================================================================ */
     async function loadStars() {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/stars`, {
@@ -318,14 +405,13 @@ const Stars = (() => {
                     hug: s.hugCount || 0,
                     strong: s.strongCount || 0,
                 };
+                s.isMoodPost = s.isMoodPost || false;
                 const el = _createDomStar(s);
                 domStars.push({ el, data: s });
             });
         } catch (err) {
             console.warn('loadStars error, dùng demo stars:', err);
-            if (domStars.length === 0) {
-                _addDemoStars();
-            }
+            if (domStars.length === 0) _addDemoStars();
         }
     }
 
@@ -333,21 +419,24 @@ const Stars = (() => {
         domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
         domStars = [];
         const demos = [
-            { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'shooting', isNegative: true, reactions: { listen: 3, hug: 1 } },
-            { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'north', isNegative: false, reactions: { strong: 2 } },
-            { id: 3, text: 'Tiếng mưa buổi sáng thật bình yên 🌧️', type: 'cluster', isNegative: false, reactions: {} },
-            { id: 4, text: 'Muốn được ngủ đủ giấc một lần thôi...', type: 'shooting', isNegative: true, reactions: { hug: 5 } },
-            { id: 5, text: 'Bầu trời đêm nay đẹp không ai ơi 🌙', type: 'north', isNegative: false, reactions: {} },
-            { id: 6, text: 'Nhớ nhà quá, xa nhà được 3 tháng rồi', type: 'cluster', isNegative: true, reactions: { listen: 2, hug: 4 } },
-            { id: 7, text: 'Cuối cùng cũng hoàn thành project ✨', type: 'shooting', isNegative: false, reactions: { strong: 7 } },
-            { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'cluster', isNegative: true, reactions: { listen: 1 } },
-            { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'north', isNegative: false, reactions: {} },
-            { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'north', isNegative: false, reactions: { hug: 12, listen: 3 } },
+            { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'shooting', isNegative: true, isMoodPost: true, reactions: { listen: 3, hug: 1, strong: 0 }, createdAt: new Date(Date.now() - 3600000).toISOString() },
+            { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'north', isNegative: false, isMoodPost: false, reactions: { listen: 0, hug: 0, strong: 2 }, createdAt: new Date(Date.now() - 7200000).toISOString() },
+            { id: 3, text: 'Tiếng mưa buổi sáng thật bình yên 🌧️', type: 'cluster', isNegative: false, isMoodPost: false, reactions: {}, createdAt: new Date(Date.now() - 600000).toISOString() },
+            { id: 4, text: 'Muốn được ngủ đủ giấc một lần thôi...', type: 'shooting', isNegative: true, isMoodPost: true, reactions: { listen: 0, hug: 5, strong: 0 }, createdAt: new Date(Date.now() - 86400000).toISOString() },
+            { id: 5, text: 'Bầu trời đêm nay đẹp không ai ơi 🌙', type: 'north', isNegative: false, isMoodPost: false, reactions: {}, createdAt: new Date(Date.now() - 1800000).toISOString() },
+            { id: 6, text: 'Nhớ nhà quá, xa nhà được 3 tháng rồi', type: 'cluster', isNegative: true, isMoodPost: true, reactions: { listen: 2, hug: 4, strong: 0 }, createdAt: new Date(Date.now() - 43200000).toISOString() },
+            { id: 7, text: 'Cuối cùng cũng hoàn thành project ✨', type: 'shooting', isNegative: false, isMoodPost: false, reactions: { listen: 0, hug: 0, strong: 7 }, createdAt: new Date(Date.now() - 900000).toISOString() },
+            { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'cluster', isNegative: true, isMoodPost: true, reactions: { listen: 1, hug: 0, strong: 0 }, createdAt: new Date(Date.now() - 120000).toISOString() },
+            { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'north', isNegative: false, isMoodPost: false, reactions: {}, createdAt: new Date(Date.now() - 300000).toISOString() },
+            { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'north', isNegative: false, isMoodPost: false, reactions: { listen: 3, hug: 12, strong: 0 }, createdAt: new Date(Date.now() - 172800000).toISOString() },
         ];
         demos.forEach(d => {
             const s = {
-                ...d, x: 5 + Math.random() * 88, y: 5 + Math.random() * 65,
-                size: 3 + Math.random() * 5, opacity: 0.6 + Math.random() * 0.4
+                ...d,
+                x: 5 + Math.random() * 88,
+                y: 5 + Math.random() * 65,
+                size: 3 + Math.random() * 5,
+                opacity: 0.6 + Math.random() * 0.4
             };
             const el = _createDomStar(s);
             domStars.push({ el, data: s });
@@ -355,9 +444,8 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       FLY ANIMATIONS - 3 loại sao bay khác nhau
+       FLY ANIMATIONS
        ================================================================ */
-
     function _flyShootingStar(startX, startY, targetX, targetY, onDone) {
         const W = window.innerWidth, H = window.innerHeight;
         const cv = document.createElement('canvas');
@@ -564,7 +652,7 @@ const Stars = (() => {
     /* ================================================================
        SEND SIGNAL
        ================================================================ */
-    async function sendSignal(text, type, showHeal = true) {
+    async function sendSignal(text, type, showHeal = true, isMoodPost = false) {
         if (!text || !text.trim()) return;
 
         if (typeof Sound !== 'undefined') Sound.playBell();
@@ -603,6 +691,9 @@ const Stars = (() => {
             : validType === 'cluster' ? _flyClusterStar
                 : _flyShootingStar;
 
+        // Lưu thời điểm gửi ngay lập tức
+        const sentAt = new Date().toISOString();
+
         flyFn(startX, startY, flyTargetX, flyTargetY, async () => {
             const data = {
                 id: null,
@@ -613,9 +704,11 @@ const Stars = (() => {
                 size: starSize,
                 opacity: 0.85,
                 isNegative: _isNegative(text),
-                reactions: {},
-                // Lưu nickname của người gửi vào data của ngôi sao
-                nickname: STATE.user?.nickname || STATE.user?.username || ''
+                isMoodPost: isMoodPost,
+                createdAt: sentAt,
+                reactions: { listen: 0, hug: 0, strong: 0 },
+                nickname: STATE.user?.nickname || STATE.user?.username || '',
+                userId: STATE.user?.id || null
             };
 
             const el = _createDomStar(data);
@@ -627,7 +720,7 @@ const Stars = (() => {
                 requestAnimationFrame(() => { el.style.opacity = '1'; });
             });
 
-            const id = await _postStar(text, validType, xPct, yPct);
+            const id = await _postStar(text, validType, xPct, yPct, isMoodPost, sentAt);
             if (id) data.id = id;
 
             await _syncPointsFromServer();
@@ -635,7 +728,7 @@ const Stars = (() => {
         });
     }
 
-    async function _postStar(text, type, x, y) {
+    async function _postStar(text, type, x, y, isMoodPost = false, createdAt = null) {
         try {
             const res = await fetch(`${CONFIG.API_BASE}/stars`, {
                 method: 'POST',
@@ -643,7 +736,12 @@ const Stars = (() => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${STATE.user?.token}`
                 },
-                body: JSON.stringify({ text, type, x, y, nickname: STATE.user?.nickname || STATE.user?.username || 'Ẩn danh' })
+                body: JSON.stringify({
+                    text, type, x, y,
+                    isMoodPost,
+                    createdAt: createdAt || new Date().toISOString(),
+                    nickname: STATE.user?.nickname || STATE.user?.username || 'Ẩn danh'
+                })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -655,7 +753,7 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       SHOOTING STAR (mini game bắt sao)
+       SHOOTING STAR (mini game)
        ================================================================ */
     function _isShootingStarDone() {
         return !!(STATE.dailyMissions && STATE.dailyMissions['shooting_star_done']);
@@ -819,5 +917,9 @@ const Stars = (() => {
         }
     }
 
-    return { loadStars, sendSignal, startShootingStarCycle, startMeteorRain, initPopupClose };
+    return {
+        loadStars, sendSignal, startShootingStarCycle,
+        startMeteorRain, initPopupClose,
+        _clearDomStars: () => { domStars = []; }  // ← thêm dòng này
+    };
 })();

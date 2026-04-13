@@ -2,6 +2,7 @@
    TRẠM GỬI TÍN HIỆU - ui.js
    UI helpers: toast, points, panels, typewriter,
    healing quotes, panel toggles + NotifSystem
+   + Void hold timer (bao quanh Hố Đen, 10s)
    ================================================ */
 
 /* ============================================================
@@ -158,6 +159,135 @@ const NotifSystem = (() => {
     }
 
     return { init, add };
+})();
+
+
+/* ============================================================
+   VOID HOLD TIMER
+   Bao quanh bên ngoài .void (110×110px)
+   .void-timer = 130×130px (nhô ra 10px mỗi bên)
+   SVG viewBox="0 0 130 130", circle r=62
+   circumference = 2π × 62 ≈ 390
+   ============================================================ */
+const VoidTimer = (() => {
+    const HOLD_DURATION = 10000; // 10 giây
+    const CIRCUMFERENCE = 390;   // 2π × 62
+
+    let holdTimer = null;
+    let rafId = null;
+    let startTime = null;
+    let isHolding = false;
+    let voidEl, timerWrap, progressEl, countEl;
+
+    function _getEls() {
+        voidEl = document.getElementById('void');
+        timerWrap = document.getElementById('void-timer');
+        progressEl = document.getElementById('timer-progress');
+        countEl = document.getElementById('void-count');
+    }
+
+    function _showTimer() {
+        timerWrap.classList.remove('hidden');
+        progressEl.style.strokeDashoffset = CIRCUMFERENCE;
+        countEl.textContent = '10';
+    }
+
+    function _hideTimer() {
+        timerWrap.classList.add('hidden');
+        progressEl.style.strokeDashoffset = CIRCUMFERENCE;
+        countEl.textContent = '10';
+    }
+
+    function _tick() {
+        const elapsed = Date.now() - startTime;
+        const fraction = Math.min(elapsed / HOLD_DURATION, 1);
+
+        // Vòng tròn chạy từ rỗng → đầy (390 → 0)
+        progressEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - fraction);
+
+        // Đếm ngược 10 → 0
+        const remaining = Math.ceil((HOLD_DURATION - elapsed) / 1000);
+        countEl.textContent = Math.max(remaining, 0);
+
+        if (isHolding) {
+            rafId = requestAnimationFrame(_tick);
+        }
+    }
+
+    function _startHold(e) {
+        // Ngăn scroll khi touch
+        if (e && e.type === 'touchstart') e.preventDefault();
+        if (isHolding) return;
+        isHolding = true;
+        startTime = Date.now();
+
+        _showTimer();
+        rafId = requestAnimationFrame(_tick);
+
+        holdTimer = setTimeout(_finishHold, HOLD_DURATION);
+    }
+
+    function _finishHold() {
+        _stopHold();
+
+        // Đảm bảo vòng đầy + số = 0
+        progressEl.style.strokeDashoffset = 0;
+        countEl.textContent = '0';
+
+        // Flash
+        if (voidEl) {
+            voidEl.style.animation = 'voidFlash 0.6s ease';
+            setTimeout(() => { voidEl.style.animation = ''; }, 700);
+        }
+
+        // Dispatch event để app.js ghi điểm
+        document.dispatchEvent(new CustomEvent('void:released'));
+
+        // Toast buông bỏ
+        if (typeof UI !== 'undefined') {
+            UI.showToast('🌑 Bạn đã buông bỏ thành công. Hãy thở sâu~', 4000);
+        }
+
+        // Ẩn timer sau 0.9s
+        setTimeout(_hideTimer, 900);
+    }
+
+    function _cancelHold() {
+        if (!isHolding) return;
+        _stopHold();
+        _hideTimer();
+    }
+
+    function _stopHold() {
+        isHolding = false;
+        if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    }
+
+    function init() {
+        _getEls();
+        if (!voidEl) return;
+
+        // Xoá mọi listener cũ bằng cách clone
+        const newVoid = voidEl.cloneNode(true);
+        voidEl.parentNode.replaceChild(newVoid, voidEl);
+        voidEl = newVoid;
+        // Lấy lại reference timer sau khi clone (timer nằm bên trong void)
+        timerWrap = document.getElementById('void-timer');
+        progressEl = document.getElementById('timer-progress');
+        countEl = document.getElementById('void-count');
+
+        // Mouse
+        voidEl.addEventListener('mousedown', _startHold);
+        window.addEventListener('mouseup', _cancelHold);
+
+        // Touch — preventDefault để không scroll
+        voidEl.addEventListener('touchstart', _startHold, { passive: false });
+        window.addEventListener('touchend', _cancelHold, { passive: true });
+        window.addEventListener('touchcancel', _cancelHold, { passive: true });
+    }
+
+    return { init };
 })();
 
 
@@ -324,7 +454,6 @@ const UI = (() => {
     function _showLogoutModal() {
         const modal = document.getElementById('logout-modal');
         if (!modal) {
-            // Fallback nếu chưa có HTML modal
             if (confirm('Rời Trạm? Tiến trình đã được lưu.')) {
                 Auth.logout();
                 location.reload();
@@ -334,11 +463,9 @@ const UI = (() => {
 
         modal.classList.remove('hidden');
 
-        // Nút Ở lại
         const cancelBtn = document.getElementById('logout-cancel');
         const confirmBtn = document.getElementById('logout-confirm');
 
-        // Clone để xóa event cũ
         const newCancel = cancelBtn.cloneNode(true);
         const newConfirm = confirmBtn.cloneNode(true);
         cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
@@ -350,14 +477,12 @@ const UI = (() => {
 
         newConfirm.addEventListener('click', () => {
             modal.classList.add('hidden');
-            // Animation rocket bay đi trước khi logout
             _animateRocketExit(() => {
                 Auth.logout();
                 location.reload();
             });
         });
 
-        // Bấm ngoài backdrop để đóng
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.classList.add('hidden');
         }, { once: true });
@@ -446,11 +571,14 @@ const UI = (() => {
         }
 
         if (btnLogout) {
-            // ── Thay confirm() bằng modal đẹp ──
             btnLogout.addEventListener('click', () => _showLogoutModal());
         }
 
         NotifSystem.init();
+
+        // ── Khởi tạo Void Hold Timer ──
+        // Dùng setTimeout để đảm bảo DOM #void đã render xong
+        setTimeout(() => VoidTimer.init(), 200);
     }
 
     function togglePanel(id) {

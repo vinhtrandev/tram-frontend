@@ -1,0 +1,553 @@
+/* ================================================
+   HỐ ĐEN v3 — Gravitational lensing nâng cấp
+   ================================================ */
+
+/* ── Container ── */
+.void-container {
+    position: fixed;
+    bottom: 48px;
+    left: 50px;
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.void-label {
+    font-size: .68rem;
+    letter-spacing: .18em;
+    color: rgba(180, 160, 220, 0.6);
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(160, 100, 255, 0.5);
+    animation: labelBreath 4s ease-in-out infinite;
+}
+
+@keyframes labelBreath {
+
+    0%,
+    100% {
+        opacity: 0.55;
+        letter-spacing: .18em;
+    }
+
+    50% {
+        opacity: 0.9;
+        letter-spacing: .22em;
+    }
+}
+
+/* ── Void wrapper ── */
+.void {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+/* ── Outer ambient glow — multi-layer halo ── */
+.void-glow-outer {
+    position: absolute;
+    inset: -24px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: voidRotateOuter 22s linear infinite;
+    background:
+        radial-gradient(ellipse at center,
+            transparent 35%,
+            rgba(80, 30, 180, 0.06) 48%,
+            rgba(140, 70, 255, 0.18) 58%,
+            rgba(190, 120, 255, 0.28) 65%,
+            rgba(220, 160, 255, 0.14) 73%,
+            rgba(160, 90, 240, 0.06) 82%,
+            transparent 92%);
+    filter: blur(1.5px);
+}
+
+/* ── Accretion disk — hot plasma look ── */
+.void-accretion {
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: voidAccretionSpin 7s linear infinite;
+    background: conic-gradient(from 160deg,
+            transparent 0%,
+            rgba(100, 40, 220, 0.0) 8%,
+            rgba(160, 70, 255, 0.22) 16%,
+            rgba(210, 120, 255, 0.50) 23%,
+            rgba(240, 170, 255, 0.60) 29%,
+            rgba(255, 210, 255, 0.45) 34%,
+            rgba(210, 150, 255, 0.28) 42%,
+            rgba(130, 60, 220, 0.10) 55%,
+            transparent 65%,
+            rgba(90, 40, 180, 0.05) 72%,
+            rgba(130, 70, 220, 0.15) 80%,
+            rgba(180, 100, 255, 0.32) 87%,
+            rgba(150, 80, 240, 0.18) 94%,
+            transparent 100%);
+    filter: blur(0.5px);
+}
+
+/* ── Photon ring — bright arc ── */
+.void-photon-ring {
+    position: absolute;
+    inset: 2px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: voidPhotonSpin 5s linear infinite;
+    background: conic-gradient(from 0deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0) 15%,
+            rgba(230, 180, 255, 0.55) 28%,
+            rgba(255, 220, 255, 0.85) 36%,
+            rgba(230, 180, 255, 0.55) 44%,
+            transparent 60%,
+            rgba(200, 140, 255, 0.2) 75%,
+            rgba(220, 160, 255, 0.4) 83%,
+            rgba(200, 140, 255, 0.2) 91%,
+            transparent 100%);
+    -webkit-mask: radial-gradient(ellipse at center,
+            transparent 80%,
+            black 83%,
+            black 92%,
+            transparent 95%);
+    mask: radial-gradient(ellipse at center,
+            transparent 80%,
+            black 83%,
+            black 92%,
+            transparent 95%);
+    filter: blur(0.3px);
+}
+
+/* ── Event horizon (shadow) ── */
+.void-shadow {
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 36% 32%,
+            #1a0e30 0%,
+            #0e0820 35%,
+            #060412 65%,
+            #010108 85%,
+            #000000 100%);
+    box-shadow:
+        0 0 0 1px rgba(80, 40, 160, 0.20),
+        inset 0 0 40px rgba(0, 0, 0, 1),
+        inset 0 0 10px rgba(40, 0, 80, 0.4);
+    /* Subtle lens distortion shimmer */
+    overflow: hidden;
+}
+
+.void-shadow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 28% 28%,
+            rgba(120, 60, 200, 0.06) 0%,
+            transparent 50%);
+    animation: lensShimmer 6s ease-in-out infinite;
+}
+
+@keyframes lensShimmer {
+
+    0%,
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.9;
+        transform: scale(1.05) rotate(15deg);
+    }
+}
+
+/* ── Spiral filaments ── */
+.void-spiral {
+    position: absolute;
+    inset: 20px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: voidSpiralSpin 14s linear infinite reverse;
+    border: 1px solid rgba(140, 80, 255, 0.14);
+}
+
+.void-spiral::before {
+    content: '';
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(180, 110, 255, 0.08);
+    animation: voidSpiralSpin 8s linear infinite;
+}
+
+.void-spiral::after {
+    content: '';
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    border: 0.5px solid rgba(220, 160, 255, 0.05);
+}
+
+/* ── Singularity dot ── */
+.void-core {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.void-core::after {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(230, 200, 255, 0.8);
+    box-shadow:
+        0 0 6px 2px rgba(200, 140, 255, 0.9),
+        0 0 16px 4px rgba(160, 80, 255, 0.5),
+        0 0 32px 6px rgba(120, 40, 220, 0.3);
+    animation: corePulse 2.5s ease-in-out infinite;
+}
+
+/* ── Hint text ── */
+.void-hint {
+    font-size: .66rem;
+    color: rgba(200, 170, 255, 0.4);
+    text-align: center;
+    max-width: 110px;
+    line-height: 1.45;
+    transition: color 0.4s;
+}
+
+.void:hover~.void-hint,
+.void-container:hover .void-hint {
+    color: rgba(200, 170, 255, 0.75);
+}
+
+/* ── Hover: intensify ── */
+.void:hover .void-glow-outer {
+    filter: blur(1px) brightness(1.5);
+}
+
+.void:hover .void-accretion {
+    animation-duration: 4.5s;
+    filter: brightness(1.4) blur(0.3px);
+}
+
+.void:hover .void-photon-ring {
+    animation-duration: 3s;
+    filter: brightness(1.8);
+}
+
+.void:hover .void-core::after {
+    box-shadow:
+        0 0 10px 3px rgba(200, 140, 255, 1),
+        0 0 28px 7px rgba(160, 80, 255, 0.8),
+        0 0 50px 12px rgba(120, 40, 220, 0.5);
+}
+
+/* ── Holding state (pressing) ── */
+.void.holding .void-accretion {
+    animation-duration: 2.5s;
+    filter: brightness(1.8) saturate(1.4);
+}
+
+.void.holding .void-photon-ring {
+    animation-duration: 1.8s;
+    filter: brightness(2.2);
+}
+
+.void.holding .void-glow-outer {
+    filter: blur(0.5px) brightness(2.5);
+}
+
+.void.holding .void-shadow {
+    box-shadow: 0 0 0 1px rgba(80, 40, 160, 0.5), inset 0 0 60px rgba(60, 0, 120, 0.6), inset 0 0 15px rgba(100, 0, 200, 0.4);
+}
+
+/* ── Void timer ── */
+.void-timer {
+    position: absolute;
+    top: -12px;
+    left: -12px;
+    width: 144px;
+    height: 144px;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.void-timer svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+    overflow: visible;
+}
+
+.timer-track {
+    fill: none;
+    stroke: rgba(200, 140, 255, 0.12);
+    stroke-width: 2.5;
+}
+
+.timer-progress {
+    fill: none;
+    stroke: url(#timerGrad);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-dasharray: 415;
+    stroke-dashoffset: 415;
+    transition: stroke-dashoffset 0.1s linear;
+    filter: drop-shadow(0 0 4px rgba(200, 140, 255, 0.9));
+}
+
+#void-count {
+    position: relative;
+    z-index: 3;
+    font-size: 1rem;
+    font-weight: 700;
+    color: rgba(220, 180, 255, 0.95);
+    font-family: var(--font-body);
+    text-shadow: 0 0 12px rgba(180, 100, 255, 0.8);
+}
+
+/* ── Keyframes ── */
+@keyframes voidRotateOuter {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes voidAccretionSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes voidPhotonSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes voidSpiralSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes corePulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+
+    50% {
+        transform: scale(1.8);
+        opacity: 1;
+    }
+}
+
+@keyframes voidFlash {
+    0% {
+        filter: brightness(1);
+    }
+
+    40% {
+        filter: brightness(3) saturate(2);
+    }
+
+    100% {
+        filter: brightness(1);
+    }
+}
+
+/* ================================================================
+   SUCK-IN ANIMATION — ngôi sao bị hút vào hố đen
+   ================================================================ */
+
+/* Star đang bị hút: thêm class void-sucking vào .star-wrapper */
+.star-wrapper.void-sucking {
+    pointer-events: none;
+    z-index: 450 !important;
+    animation: none !important;
+}
+
+/* Particle vệt sáng bay vào hố đen */
+.void-particle {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 460;
+    will-change: transform, opacity;
+}
+
+/* Flash trắng khi ngôi sao vào lõi */
+.void-impact-flash {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 500;
+    background: radial-gradient(circle,
+            rgba(255, 255, 255, 1) 0%,
+            rgba(220, 160, 255, 0.8) 30%,
+            rgba(160, 80, 255, 0.4) 60%,
+            transparent 100%);
+    transform: translate(-50%, -50%) scale(0);
+    animation: voidImpact 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes voidImpact {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 1;
+    }
+
+    40% {
+        transform: translate(-50%, -50%) scale(2.5);
+        opacity: 0.9;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(6);
+        opacity: 0;
+    }
+}
+
+/* Ripple vòng tròn sóng hấp dẫn */
+.void-gravity-wave {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 455;
+    border: 1.5px solid rgba(180, 100, 255, 0.6);
+    transform: translate(-50%, -50%) scale(0);
+    animation: gravWave 1s ease-out forwards;
+}
+
+@keyframes gravWave {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(4);
+        opacity: 0;
+    }
+}
+
+/* Text "+X ngôi sao bị hút" */
+.void-absorb-count {
+    position: fixed;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(210, 160, 255, 0.9);
+    letter-spacing: 0.06em;
+    pointer-events: none;
+    z-index: 500;
+    white-space: nowrap;
+    animation: absorbCountFloat 1.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    text-shadow: 0 0 10px rgba(180, 80, 255, 0.7);
+}
+
+@keyframes absorbCountFloat {
+    0% {
+        opacity: 0;
+        transform: translateY(0) scale(0.8);
+    }
+
+    20% {
+        opacity: 1;
+        transform: translateY(-8px) scale(1.05);
+    }
+
+    70% {
+        opacity: 1;
+        transform: translateY(-22px) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-38px) scale(0.9);
+    }
+}
+
+/* ── Release explosion ── */
+.void-release-burst {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 499;
+    transform: translate(-50%, -50%) scale(0);
+    animation: releaseBurst 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    background: radial-gradient(circle,
+            rgba(255, 240, 255, 0.9) 0%,
+            rgba(200, 120, 255, 0.5) 40%,
+            rgba(120, 40, 220, 0.2) 70%,
+            transparent 100%);
+}
+
+@keyframes releaseBurst {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 1;
+    }
+
+    30% {
+        transform: translate(-50%, -50%) scale(3);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(10);
+        opacity: 0;
+    }
+}
+
+/* Ngôi sao bắn ra sau khi release */
+.void-ejected-star {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 490;
+    will-change: transform, opacity;
+    background: radial-gradient(circle, #fff 0%, rgba(200, 150, 255, 0.6) 60%, transparent 100%);
+    box-shadow: 0 0 8px 3px rgba(200, 140, 255, 0.7);
+}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 700px) {
+    .void-container {
+        left: 20px;
+        bottom: 100px;
+    }
+
+    .void {
+        width: 100px;
+        height: 100px;
+    }
+
+    .void-timer {
+        top: -10px;
+        left: -10px;
+        width: 120px;
+        height: 120px;
+    }
+}

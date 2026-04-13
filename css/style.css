@@ -1,8 +1,9 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - style.css (FULL v4)
-   + Hố Đen redesign — gravitational lensing
-   + Profile pill + shimmer effect
-   + .void-effect-badge, #heal-toast, .void-ripple-fx
+   TRẠM GỬI TÍN HIỆU - style.css (FULL v6)
+   + Label "Vũ Trụ" giữa màn hình redesign đẹp
+   + Nav-user profile pill redesign (avatar + divider)
+   + FIX: void-timer bao quanh ngoài Hố Đen (130×130, top:-10px)
+   + FIX: void-container căn đối
    ================================================ */
 
 :root {
@@ -406,7 +407,9 @@ canvas {
     background: rgba(255, 255, 255, .07);
 }
 
-/* ── Nav right + profile pill ── */
+/* ==============================
+   NAV RIGHT + PROFILE PILL
+   ============================== */
 .nav-right {
     display: flex;
     align-items: center;
@@ -417,23 +420,82 @@ canvas {
 .nav-user {
     position: relative;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 1px;
-    padding: 8px 16px 8px 14px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px 6px 8px;
     border-radius: 50px;
-    background: rgba(255, 255, 255, 0.035);
-    border: 1px solid rgba(160, 100, 255, 0.18);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(160, 120, 255, 0.22);
     overflow: hidden;
-    transition: border-color 0.3s ease, background 0.3s ease;
+    cursor: default;
+    transition: border-color 0.35s ease, background 0.35s ease, box-shadow 0.35s ease;
 }
 
 .nav-user:hover {
-    background: rgba(160, 100, 255, 0.07);
-    border-color: rgba(180, 120, 255, 0.32);
+    background: rgba(160, 100, 255, 0.09);
+    border-color: rgba(190, 140, 255, 0.4);
+    box-shadow: 0 0 20px rgba(140, 80, 255, 0.14);
 }
 
-/* Vệt sáng chạy qua profile */
+.nav-user-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed 0%, #c084fc 55%, #f472b6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    box-shadow:
+        0 0 0 1.5px rgba(255, 255, 255, 0.15),
+        0 0 14px rgba(192, 132, 252, 0.45);
+    text-transform: uppercase;
+    user-select: none;
+}
+
+.nav-user-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.09);
+    flex-shrink: 0;
+}
+
+.nav-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+}
+
+.nav-nickname {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: rgba(235, 220, 255, 0.95);
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+
+.nav-points {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.66rem;
+    color: rgba(185, 155, 255, 0.52);
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+}
+
+#user-points {
+    color: #f0d060;
+    text-shadow: 0 0 8px rgba(240, 200, 60, 0.45);
+    font-weight: 700;
+}
+
 .nav-user::before {
     content: '';
     position: absolute;
@@ -443,12 +505,12 @@ canvas {
     height: 220%;
     background: linear-gradient(105deg,
             transparent 0%,
-            rgba(200, 160, 255, 0.05) 30%,
-            rgba(225, 185, 255, 0.18) 50%,
-            rgba(200, 160, 255, 0.05) 70%,
+            rgba(200, 160, 255, 0.04) 30%,
+            rgba(225, 185, 255, 0.14) 50%,
+            rgba(200, 160, 255, 0.04) 70%,
             transparent 100%);
     transform: skewX(-15deg);
-    animation: navShimmer 4s ease-in-out infinite;
+    animation: navShimmer 5s ease-in-out infinite;
     pointer-events: none;
 }
 
@@ -475,27 +537,6 @@ canvas {
         left: 150%;
         opacity: 0;
     }
-}
-
-.nav-nickname {
-    font-size: .82rem;
-    font-weight: 600;
-    color: rgba(230, 210, 255, 0.92);
-    letter-spacing: 0.05em;
-    line-height: 1.2;
-}
-
-.nav-points {
-    font-size: .68rem;
-    color: rgba(200, 170, 255, 0.58);
-    letter-spacing: 0.03em;
-    line-height: 1.2;
-}
-
-#user-points {
-    color: #f0d060;
-    text-shadow: 0 0 8px rgba(240, 200, 60, 0.5);
-    font-weight: 700;
 }
 
 /* ── Bell ── */
@@ -620,19 +661,135 @@ canvas {
     flex-direction: column;
     align-items: center;
     gap: 14px;
-    margin-top: 20px;
 }
 
+.center-input-area:not(.hidden) {
+    animation: panelFadeIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes panelFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, calc(-50% + 14px));
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* ==============================
+   LABEL "HÔM NAY, BẠN MUỐN GỬI GÌ TỚI VŨ TRỤ?"
+   — Redesign đẹp v6
+   ============================== */
 .center-input-label {
-    font-size: 1.05rem;
-    color: var(--text-main);
+    position: relative;
+    font-size: 1.22rem;
+    color: rgba(245, 238, 255, 0.95);
     font-family: var(--font-display);
     font-style: italic;
     text-align: center;
-    text-shadow: 0 0 30px rgba(206, 147, 216, .4);
-    letter-spacing: .02em;
+    letter-spacing: 0.025em;
+    line-height: 1.55;
+    padding: 6px 28px 22px;
+
+    /* Glow nhấp nháy nhẹ */
+    text-shadow:
+        0 0 35px rgba(206, 147, 216, 0.55),
+        0 0 70px rgba(244, 143, 177, 0.22),
+        0 2px 14px rgba(0, 0, 0, 0.65);
+
+    animation: labelCosmicGlow 5s ease-in-out infinite;
 }
 
+/* Dải sáng gradient dưới chữ */
+.center-input-label::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 1.5px;
+    border-radius: 2px;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(206, 147, 216, 0.5) 20%,
+            rgba(244, 143, 177, 1) 50%,
+            rgba(206, 147, 216, 0.5) 80%,
+            transparent 100%);
+    opacity: 0.75;
+    animation: labelLineShimmer 4s ease-in-out infinite;
+}
+
+/* Ngôi sao ✦ nhỏ bên trái */
+.center-input-label::before {
+    content: '✦';
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-65%);
+    font-size: 0.52rem;
+    font-style: normal;
+    color: rgba(206, 147, 216, 0.55);
+    animation: labelStarSpin 6s linear infinite;
+    letter-spacing: 0;
+}
+
+@keyframes labelCosmicGlow {
+
+    0%,
+    100% {
+        text-shadow:
+            0 0 35px rgba(206, 147, 216, 0.5),
+            0 0 70px rgba(244, 143, 177, 0.2),
+            0 2px 14px rgba(0, 0, 0, 0.65);
+        opacity: 0.92;
+    }
+
+    50% {
+        text-shadow:
+            0 0 55px rgba(206, 147, 216, 0.8),
+            0 0 110px rgba(244, 143, 177, 0.38),
+            0 0 180px rgba(180, 120, 255, 0.18),
+            0 2px 14px rgba(0, 0, 0, 0.65);
+        opacity: 1;
+    }
+}
+
+@keyframes labelLineShimmer {
+
+    0%,
+    100% {
+        width: 48px;
+        opacity: 0.6;
+    }
+
+    50% {
+        width: 88px;
+        opacity: 1;
+    }
+}
+
+@keyframes labelStarSpin {
+    0% {
+        opacity: 0.3;
+        transform: translateY(-65%) rotate(0deg) scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translateY(-65%) rotate(180deg) scale(1.4);
+    }
+
+    100% {
+        opacity: 0.3;
+        transform: translateY(-65%) rotate(360deg) scale(1);
+    }
+}
+
+/* ── Input box ── */
 .center-input-box {
     width: 100%;
     padding: 16px 20px 14px;
@@ -726,182 +883,113 @@ canvas {
     display: block;
 }
 
+/* ==============================
+   NÚT GỬI TÍN HIỆU
+   ============================== */
 .btn-send {
-    padding: 8px 22px;
-    border-radius: 22px;
-    background: linear-gradient(135deg, rgba(206, 147, 216, .3), rgba(244, 143, 177, .2));
-    border: 1px solid rgba(206, 147, 216, .45);
-    color: var(--text-main);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 28px;
+    border-radius: 50px;
+    background: rgba(22, 18, 38, 0.75);
+    border: 1.5px solid rgba(200, 180, 255, 0.30);
+    color: rgba(235, 225, 255, 0.92);
     font-family: var(--font-body);
-    font-size: .82rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
     cursor: pointer;
-    transition: var(--transition);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: background 0.3s, border-color 0.3s, box-shadow 0.3s, transform 0.15s;
     white-space: nowrap;
+    line-height: 1;
+    position: relative;
+    overflow: hidden;
 }
 
 .btn-send:hover {
-    box-shadow: 0 0 24px rgba(206, 147, 216, .35);
-    transform: scale(1.03);
+    background: rgba(35, 25, 60, 0.88);
+    border-color: rgba(200, 160, 255, 0.55);
+    box-shadow: 0 0 24px rgba(150, 90, 255, 0.22);
+    transform: translateY(-1px);
+    color: #fff;
+}
+
+.btn-send:active {
+    transform: scale(0.97);
+}
+
+.btn-send-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 5px rgba(180, 150, 255, 0.55));
 }
 
 /* ==============================
-   HỐ ĐEN — Gravitational lensing redesign
+   NÚT HỦY
    ============================== */
-.void-container {
-    position: fixed;
-    bottom: 160px;
-    left: 28px;
-    z-index: 400;
-    display: flex;
-    flex-direction: column;
+.btn-cancel-signal {
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-}
-
-.void-label {
-    font-size: .68rem;
-    letter-spacing: .14em;
-    color: rgba(180, 160, 220, 0.55);
-    text-transform: uppercase;
-}
-
-.void {
-    position: relative;
-    width: 110px;
-    height: 110px;
+    padding: 13px 24px;
+    border-radius: 50px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1.5px solid rgba(255, 255, 255, 0.10);
+    color: rgba(200, 185, 220, 0.50);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
     cursor: pointer;
-    border-radius: 50%;
+    backdrop-filter: blur(10px);
+    transition: background 0.25s, border-color 0.25s, color 0.25s, transform 0.15s;
+    white-space: nowrap;
+    line-height: 1;
 }
 
-/* Lớp glow ngoài — gravitational lensing halo */
-.void-glow-outer {
-    position: absolute;
-    inset: -18px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at center,
-            transparent 38%,
-            rgba(120, 70, 200, 0.04) 50%,
-            rgba(160, 100, 255, 0.13) 62%,
-            rgba(200, 140, 255, 0.22) 70%,
-            rgba(180, 120, 240, 0.12) 78%,
-            transparent 90%);
-    pointer-events: none;
-    animation: voidRotateOuter 18s linear infinite;
+.btn-cancel-signal:hover {
+    background: rgba(244, 143, 177, 0.06);
+    border-color: rgba(244, 143, 177, 0.28);
+    color: rgba(244, 143, 177, 0.75);
+    transform: translateY(-1px);
 }
 
-/* Đĩa bồi tụ — accretion disk */
-.void-accretion {
-    position: absolute;
-    inset: 6px;
-    border-radius: 50%;
-    background: conic-gradient(from 200deg,
-            transparent 0%,
-            rgba(160, 80, 255, 0.0) 10%,
-            rgba(200, 120, 255, 0.25) 20%,
-            rgba(230, 160, 255, 0.45) 28%,
-            rgba(255, 200, 255, 0.35) 33%,
-            rgba(200, 140, 255, 0.2) 40%,
-            transparent 55%,
-            rgba(120, 60, 200, 0.08) 70%,
-            rgba(150, 90, 220, 0.18) 80%,
-            rgba(180, 110, 240, 0.3) 88%,
-            rgba(160, 90, 230, 0.15) 95%,
-            transparent 100%);
-    pointer-events: none;
-    animation: voidAccretionSpin 9s linear infinite;
+.btn-cancel-signal:active {
+    transform: scale(0.97);
 }
 
-/* Photon ring — vành sáng mỏng */
-.void-photon-ring {
-    position: absolute;
-    inset: 3px;
-    border-radius: 50%;
-    border: 1.5px solid transparent;
-    background:
-        radial-gradient(ellipse at 30% 25%, rgba(230, 180, 255, 0.7) 0%, transparent 40%) border-box,
-        radial-gradient(ellipse at 70% 75%, rgba(140, 80, 255, 0.4) 0%, transparent 40%) border-box;
-    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: destination-out;
-    mask-composite: exclude;
-    pointer-events: none;
-    animation: voidPhotonSpin 6s linear infinite;
-}
-
-/* Quả cầu đen trung tâm */
-.void-shadow {
-    position: absolute;
-    inset: 20px;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at 38% 36%,
-            #16102a 0%,
-            #0c0818 40%,
-            #050410 70%,
-            #020208 100%);
-    box-shadow:
-        0 0 0 1px rgba(100, 60, 180, 0.15),
-        inset 0 0 30px rgba(0, 0, 0, 0.9);
-    pointer-events: none;
-}
-
-/* Vòng xoáy bên trong */
-.void-spiral {
-    position: absolute;
-    inset: 22px;
-    border-radius: 50%;
-    border: 1px solid rgba(120, 70, 200, 0.12);
-    pointer-events: none;
-    animation: voidSpiralSpin 12s linear infinite reverse;
-}
-
-.void-spiral::before {
-    content: '';
-    position: absolute;
-    inset: 6px;
-    border-radius: 50%;
-    border: 1px solid rgba(160, 100, 240, 0.08);
-}
-
-/* Điểm sáng trung tâm */
-.void-core {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
+.input-footer-left {
     display: flex;
     align-items: center;
-    justify-content: center;
-    pointer-events: none;
+    gap: 8px;
+    flex: 1;
 }
 
-.void-core::after {
-    content: '';
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: rgba(220, 180, 255, 0.6);
-    box-shadow: 0 0 8px rgba(200, 140, 255, 0.8), 0 0 20px rgba(160, 80, 255, 0.4);
-    animation: corePulse 3s ease-in-out infinite;
+.input-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
 }
 
-.void-hint {
-    font-size: .66rem;
-    color: var(--text-dim);
-    text-align: center;
-    max-width: 100px;
-    line-height: 1.4;
-}
 
-/* Timer overlay */
+/* ==============================
+   VOID TIMER
+   ============================== */
 .void-timer {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: -10px;
+    left: -10px;
+    width: 130px;
+    height: 130px;
     pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 10;
 }
 
 .void-timer svg {
@@ -910,22 +998,24 @@ canvas {
     width: 100%;
     height: 100%;
     transform: rotate(-90deg);
+    overflow: visible;
 }
 
 .timer-track {
     fill: none;
-    stroke: rgba(200, 140, 255, 0.12);
-    stroke-width: 2;
+    stroke: rgba(200, 140, 255, 0.18);
+    stroke-width: 3;
 }
 
 .timer-progress {
     fill: none;
-    stroke: rgba(200, 140, 255, 0.7);
-    stroke-width: 2;
+    stroke: rgba(210, 160, 255, 0.92);
+    stroke-width: 3;
     stroke-linecap: round;
-    stroke-dasharray: 163;
-    stroke-dashoffset: 163;
+    stroke-dasharray: 390;
+    stroke-dashoffset: 390;
     transition: stroke-dashoffset 0.1s linear;
+    filter: drop-shadow(0 0 5px rgba(180, 120, 255, 0.85));
 }
 
 #void-count {
@@ -1030,9 +1120,7 @@ canvas {
     text-align: center;
     pointer-events: none;
     opacity: 0;
-    box-shadow:
-        0 0 40px rgba(150, 60, 255, 0.15),
-        inset 0 0 30px rgba(100, 30, 200, 0.08);
+    box-shadow: 0 0 40px rgba(150, 60, 255, 0.15), inset 0 0 30px rgba(100, 30, 200, 0.08);
     transition: opacity 0.55s ease, transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1525,84 +1613,194 @@ canvas {
 }
 
 /* ==============================
-   STAR POPUP
+   STAR POPUP — redesign
    ============================== */
 .star-popup {
     position: fixed;
     z-index: 300;
-    padding: 20px;
-    width: min(280px, 85vw);
+    padding: 20px 20px 16px;
+    width: min(300px, 88vw);
     pointer-events: all;
+    border-radius: 20px;
+    background: rgba(14, 12, 28, 0.94);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow:
+        0 8px 48px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(140, 90, 255, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .star-popup-header {
     display: flex;
+    align-items: flex-start;
     justify-content: space-between;
-    align-items: center;
+    gap: 8px;
     margin-bottom: 12px;
 }
 
+.star-popup-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
 .anon-label {
-    font-size: .74rem;
-    color: var(--text-dim);
-    letter-spacing: .05em;
+    font-size: 0.82rem;
+    color: rgba(200, 180, 255, 0.88);
+    font-weight: 500;
+    letter-spacing: 0.04em;
+}
+
+.popup-time {
+    font-size: 0.66rem;
+    color: rgba(255, 255, 255, 0.25);
+    letter-spacing: 0.02em;
+}
+
+.popup-mood-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(206, 147, 216, 0.12);
+    border: 1px solid rgba(206, 147, 216, 0.28);
+    color: rgba(206, 147, 216, 0.92);
+    font-size: 0.67rem;
+    font-weight: 500;
+    white-space: nowrap;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+    align-self: center;
+    transition: opacity 0.2s;
+}
+
+.popup-mood-tag.hidden {
+    display: none !important;
 }
 
 .popup-close {
     background: none;
     border: none;
-    color: var(--text-dim);
+    color: rgba(255, 255, 255, 0.28);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.88rem;
+    padding: 0;
+    line-height: 1;
+    flex-shrink: 0;
+    align-self: flex-start;
+    transition: color 0.2s;
+}
+
+.popup-close:hover {
+    color: rgba(255, 255, 255, 0.65);
 }
 
 .star-popup-text {
-    font-size: .88rem;
-    line-height: 1.7;
-    color: var(--text-main);
+    font-size: 0.94rem;
+    line-height: 1.75;
+    color: rgba(242, 236, 255, 0.92);
     font-style: italic;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     font-family: var(--font-display);
+    word-break: break-word;
+}
+
+.react-counts-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 12px;
+    min-height: 18px;
+}
+
+.react-count-item {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.28);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    letter-spacing: 0.02em;
+    transition: color 0.25s;
+}
+
+.react-count-item.has-reacts {
+    color: rgba(255, 255, 255, 0.62);
 }
 
 .reaction-btns {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     justify-content: center;
+}
+
+.react-btn-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
 }
 
 .react-btn {
-    width: 48px;
-    height: 48px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    border: 1px solid var(--glass-border);
-    background: rgba(255, 255, 255, .05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.04);
     cursor: pointer;
-    font-size: 1.4rem;
+    font-size: 1.45rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: var(--transition);
+    transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .react-btn:hover {
-    transform: scale(1.2);
-    border-color: rgba(244, 143, 177, .5);
-    box-shadow: 0 0 16px rgba(244, 143, 177, .2);
+    transform: scale(1.10);
+    border-color: rgba(244, 143, 177, 0.38);
+    background: rgba(244, 143, 177, 0.09);
+    box-shadow: 0 0 18px rgba(244, 143, 177, 0.18);
+}
+
+.react-btn.reacted {
+    border-color: rgba(206, 147, 216, 0.5);
+    background: rgba(206, 147, 216, 0.14);
+    box-shadow: 0 0 14px rgba(206, 147, 216, 0.22);
+    transform: scale(1.05);
+}
+
+.react-btn.just-reacted {
+    animation: reactPop 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes reactPop {
+    0% {
+        transform: scale(1);
+    }
+
+    55% {
+        transform: scale(1.28);
+    }
+
+    100% {
+        transform: scale(1.05);
+    }
+}
+
+.react-label-text {
+    font-size: 0.67rem;
+    color: rgba(255, 255, 255, 0.32);
+    letter-spacing: 0.03em;
+    text-align: center;
 }
 
 .react-labels {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-top: 6px;
-}
-
-.react-labels span {
-    font-size: .6rem;
-    color: var(--text-dim);
-    width: 48px;
-    text-align: center;
+    display: none !important;
 }
 
 /* ==============================
@@ -1802,6 +2000,14 @@ canvas {
     animation: notif-slide 0.25s ease;
 }
 
+.notif-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
 @keyframes notif-slide {
     from {
         opacity: 0;
@@ -1812,14 +2018,6 @@ canvas {
         opacity: 1;
         transform: translateX(0);
     }
-}
-
-.notif-item:hover {
-    background: rgba(255, 255, 255, 0.04);
-}
-
-.notif-item:last-child {
-    border-bottom: none;
 }
 
 .notif-item-icon {
@@ -1916,7 +2114,141 @@ canvas {
 }
 
 /* ==============================
-   LEGACY (hidden, kept for JS compat)
+   NÚT TOGGLE FLOATING
+   ============================== */
+.btn-toggle-input {
+    position: fixed;
+    bottom: 44px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 150;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 32px;
+    border-radius: 50px;
+    background: rgba(22, 18, 38, 0.80);
+    border: 1.5px solid rgba(200, 180, 255, 0.32);
+    color: rgba(235, 225, 255, 0.92);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    transition:
+        background 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease,
+        opacity 0.3s ease,
+        transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow:
+        0 0 28px rgba(150, 90, 255, 0.20),
+        0 4px 24px rgba(0, 0, 0, 0.40),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.btn-toggle-input:hover {
+    background: rgba(35, 25, 60, 0.92);
+    border-color: rgba(200, 160, 255, 0.58);
+    box-shadow:
+        0 0 40px rgba(150, 90, 255, 0.35),
+        0 6px 28px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.09);
+    transform: translateX(-50%) translateY(-2px);
+    color: #fff;
+}
+
+.btn-toggle-input:active {
+    transform: translateX(-50%) scale(0.97);
+}
+
+.btn-toggle-input.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(10px);
+}
+
+.btn-toggle-icon {
+    font-size: 1.15rem;
+    line-height: 1;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 5px rgba(180, 150, 255, 0.6));
+    display: flex;
+    align-items: center;
+}
+
+/* ==============================
+   MOOD HINT BAR
+   ============================== */
+.mood-hint-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    margin: 8px 0 0;
+    background: rgba(206, 147, 216, 0.07);
+    border: 1px solid rgba(206, 147, 216, 0.20);
+    border-radius: 12px;
+    font-size: 0.78rem;
+    color: rgba(220, 185, 255, 0.82);
+    line-height: 1.6;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.35s ease, transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mood-hint-bar.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.mood-hint-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ==============================
+   +5 ĐIỂM FLOAT LABEL
+   ============================== */
+.send-points-label {
+    position: fixed;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+    pointer-events: none;
+    z-index: 800;
+    animation: sendPointFloat 1.15s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    text-shadow: 0 0 8px rgba(255, 213, 79, 0.6);
+    white-space: nowrap;
+}
+
+@keyframes sendPointFloat {
+    0% {
+        opacity: 0;
+        transform: translateY(0) scale(0.8);
+    }
+
+    20% {
+        opacity: 1;
+        transform: translateY(-8px) scale(1.08);
+    }
+
+    70% {
+        opacity: 1;
+        transform: translateY(-24px) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-38px) scale(0.95);
+    }
+}
+
+/* ==============================
+   LEGACY
    ============================== */
 .telescope-area {
     display: none !important;
@@ -1947,7 +2279,7 @@ canvas {
     }
 
     .void-container {
-        left: 14px;
+        left: 20px;
         bottom: 100px;
     }
 
@@ -1965,9 +2297,21 @@ canvas {
         border-radius: 24px 24px 0 0;
     }
 
-    .astronaut-timer {
-        bottom: 180px;
-        right: 14px;
+    .btn-toggle-input {
+        bottom: 110px;
+        padding: 11px 24px;
+        font-size: 0.88rem;
+    }
+
+    .star-popup {
+        width: min(280px, 90vw);
+        padding: 16px 14px 12px;
+    }
+
+    .react-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 1.3rem;
     }
 
     #heal-toast {
@@ -1984,7 +2328,14 @@ canvas {
     }
 
     .nav-user {
-        padding: 6px 10px;
+        padding: 5px 10px 5px 6px;
+        gap: 7px;
+    }
+
+    .nav-user-avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 0.6rem;
     }
 
     .nav-nickname {
@@ -1992,7 +2343,11 @@ canvas {
     }
 
     .nav-points {
-        font-size: .62rem;
+        font-size: .6rem;
+    }
+
+    .nav-user-divider {
+        height: 14px;
     }
 }
 

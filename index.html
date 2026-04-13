@@ -16,6 +16,8 @@
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/logout-modal.css" />
     <link rel="stylesheet" href="css/AstronautTimer.css" />
+    <!-- Hố Đen v3 — thay thế phần void trong style.css -->
+    <link rel="stylesheet" href="css/blackhole.css" />
 </head>
 
 <body>
@@ -79,9 +81,13 @@
                 <button class="nav-link" id="btn-heal">Chữa Lành</button>
             </div>
             <div class="nav-right">
-                <div class="nav-user">
-                    <span class="nav-nickname" id="user-nickname">STAR_99</span>
-                    <span class="nav-points"><span id="user-points">0</span> ✨ Tinh Tú</span>
+                <div class="nav-user" id="nav-user">
+                    <div class="nav-user-avatar" id="user-avatar">--</div>
+                    <div class="nav-user-divider"></div>
+                    <div class="nav-user-info">
+                        <span class="nav-nickname" id="user-nickname">STAR_99</span>
+                        <span class="nav-points"><span id="user-points">0</span> ✦ Tinh Tú</span>
+                    </div>
                 </div>
                 <div class="nav-bell-wrapper" id="nav-bell-wrapper">
                     <button class="nav-bell" id="nav-bell-btn" title="Lịch sử Tinh Tú">🔔</button>
@@ -92,15 +98,17 @@
         </nav>
 
         <!-- ===== CENTER INPUT AREA ===== -->
-        <div class="center-input-area">
+        <div class="center-input-area hidden" id="input-panel">
             <p class="center-input-label">Hôm nay, bạn muốn gửi gì tới vũ trụ?</p>
             <div class="center-input-box glass">
                 <textarea id="signal-text" placeholder="Hãy viết một tâm tư, một điều ước, hoặc một lời cảm ơn..."
                     maxlength="200"></textarea>
                 <div class="center-input-footer">
-                    <div class="star-type-selector" id="star-type-selector"></div>
-                    <span class="char-count"><span id="char-count">0</span>/200</span>
-                    <button class="btn-send" id="btn-send">Gửi Tín Hiệu (+5 ✨)</button>
+                    <div class="input-footer-left">
+                        <div class="star-type-selector" id="star-type-selector"></div>
+                        <span class="char-count"><span id="char-count">0</span>/200</span>
+                    </div>
+                    <button class="btn-send" id="btn-send">Gửi Tín Hiệu</button>
                 </div>
             </div>
         </div>
@@ -115,12 +123,14 @@
                 <div class="void-shadow"></div>
                 <div class="void-spiral"></div>
                 <div class="void-core"></div>
-                <div class="void-timer hidden" id="void-timer">
-                    <svg viewBox="0 0 60 60">
-                        <circle cx="30" cy="30" r="26" class="timer-track" />
-                        <circle cx="30" cy="30" r="26" class="timer-progress" id="timer-progress" />
+                <!-- Timer: không hidden mặc định, BlackHole.init() tự quản lý -->
+                <div class="void-timer" id="void-timer">
+                    <svg viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
+                        <!-- gradient được inject bởi blackhole.js -->
+                        <circle cx="72" cy="72" r="66" class="timer-track" />
+                        <circle cx="72" cy="72" r="66" class="timer-progress" id="timer-progress" />
                     </svg>
-                    <span id="void-count">10</span>
+                    <span id="void-count"></span>
                 </div>
             </div>
             <div class="void-hint">Giữ 10s để buông bỏ</div>
@@ -135,10 +145,10 @@
             </div>
             <div class="sound-divider"></div>
             <div class="sound-btns">
-                <button class="sound-btn active" data-sound="rain" title="Tiếng mưa">🌧 Mưa</button>
-                <button class="sound-btn" data-sound="wave" title="Sóng biển">🌊 Sóng</button>
-                <button class="sound-btn" data-sound="wind" title="Chuông gió">🔔 Chuông</button>
-                <button class="sound-btn" data-sound="off" title="Tắt âm">🔇</button>
+                <button class="sound-btn active" data-sound="rain">🌧 Mưa</button>
+                <button class="sound-btn" data-sound="wave">🌊 Sóng</button>
+                <button class="sound-btn" data-sound="wind">🔔 Chuông</button>
+                <button class="sound-btn" data-sound="off">🔇</button>
             </div>
         </div>
 
@@ -184,21 +194,41 @@
         <!-- ===== SHOOTING STAR HINT ===== -->
         <div class="shooting-star-hint hidden" id="shooting-hint">✨ Bắt ngôi sao băng!</div>
 
-        <!-- ===== STAR POPUP ===== -->
+        <!-- ===== STAR POPUP — redesign ===== -->
         <div class="star-popup glass hidden" id="star-popup">
+
             <div class="star-popup-header">
-                <span class="anon-label">Anonymous ✦</span>
+                <div class="star-popup-meta">
+                    <span class="anon-label" id="popup-username">Ẩn danh ✦</span>
+                    <span class="popup-time" id="popup-time"></span>
+                </div>
+                <span class="popup-mood-tag hidden" id="popup-mood-tag">💜 Tâm sự buồn</span>
                 <button class="popup-close" id="popup-close">✕</button>
             </div>
+
             <p class="star-popup-text" id="star-popup-text"></p>
+
+            <div class="react-counts-row">
+                <span class="react-count-item" id="count-listen">🕯️ 0</span>
+                <span class="react-count-item" id="count-hug">❤️ 0</span>
+                <span class="react-count-item" id="count-strong">⚡ 0</span>
+            </div>
+
             <div class="reaction-btns">
-                <button class="react-btn" data-reaction="listen" title="Mình đang lắng nghe bạn">🕯️</button>
-                <button class="react-btn" data-reaction="hug" title="Gửi bạn một cái ôm">❤️</button>
-                <button class="react-btn" data-reaction="strong" title="Chúc bạn mạnh mẽ">⚡</button>
+                <div class="react-btn-wrap">
+                    <button class="react-btn" data-reaction="listen">🕯️</button>
+                    <span class="react-label-text">Lắng nghe</span>
+                </div>
+                <div class="react-btn-wrap">
+                    <button class="react-btn" data-reaction="hug">❤️</button>
+                    <span class="react-label-text">Gửi cái ôm</span>
+                </div>
+                <div class="react-btn-wrap">
+                    <button class="react-btn" data-reaction="strong">⚡</button>
+                    <span class="react-label-text">Mạnh mẽ</span>
+                </div>
             </div>
-            <div class="react-labels">
-                <span>Lắng nghe</span><span>Gửi cái ôm</span><span>Mạnh mẽ</span>
-            </div>
+
         </div>
 
         <!-- ===== PATIENT ASTRONAUT TIMER ===== -->
@@ -256,8 +286,8 @@
         <!-- Legacy telescope -->
         <div class="telescope-area hidden" id="telescope-area">
             <div class="telescope-icon" id="telescope-icon"><span>🔭</span></div>
-            <div class="input-panel glass hidden" id="input-panel"></div>
         </div>
+
     </div>
 
     <!-- ===== HEAL PANEL ===== -->
@@ -269,8 +299,7 @@
             <div class="logout-modal-icon">🚀</div>
             <h3 class="logout-modal-title">Rời Trạm?</h3>
             <p class="logout-modal-desc">
-                Tín hiệu của bạn vẫn lơ lửng giữa vũ trụ,<br />
-                chờ bạn quay về.
+                Tín hiệu của bạn vẫn lơ lửng giữa vũ trụ,<br />chờ bạn quay về.
             </p>
             <div class="logout-modal-btns">
                 <button class="logout-btn-cancel" id="logout-cancel">Ở lại</button>
@@ -289,6 +318,39 @@
     <script src="js/sound.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
+    <!-- Hố Đen v3 — load sau app.js để Stars đã sẵn sàng -->
+    <script src="js/blackhole.js"></script>
+
+    <script>
+        /* ── Avatar initials ── */
+        (function () {
+            function updateAvatar() {
+                const nicknameEl = document.getElementById('user-nickname');
+                const avatarEl = document.getElementById('user-avatar');
+                if (!nicknameEl || !avatarEl) return;
+                const nick = nicknameEl.textContent.trim();
+                if (!nick || nick === '--') return;
+                const letters = nick.replace(/[^a-zA-Z0-9]/g, '');
+                avatarEl.textContent = (letters.slice(0, 2) || nick.slice(0, 2)).toUpperCase();
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', updateAvatar);
+            } else { updateAvatar(); }
+            const obs = new MutationObserver(updateAvatar);
+            function watchNickname() {
+                const t = document.getElementById('user-nickname');
+                if (t) obs.observe(t, { childList: true, characterData: true, subtree: true });
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', watchNickname);
+            } else { watchNickname(); }
+        })();
+
+        /* ── Khởi động BlackHole sau khi DOM + scripts sẵn sàng ── */
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof BlackHole !== 'undefined') BlackHole.init();
+        });
+    </script>
 </body>
 
 </html>

@@ -14,11 +14,11 @@ const Canvas = (() => {
     /* ---------- Star layers ---------- */
     const layers = [
         // Layer 0: far (tiny, slow)
-        { stars: [], count: 160, sizeMin: 0.4, sizeMax: 1.2, speed: 0.3, baseOpacity: [0.2, 0.5] },
+        { stars: [], count: 160, sizeMin: 0.8, sizeMax: 2.2, speed: 0.3, baseOpacity: [0.25, 0.6] },
         // Layer 1: mid
-        { stars: [], count: 80, sizeMin: 1.2, sizeMax: 2.5, speed: 0.6, baseOpacity: [0.4, 0.8] },
+        { stars: [], count: 80, sizeMin: 2.2, sizeMax: 4.5, speed: 0.6, baseOpacity: [0.45, 0.85] },
         // Layer 2: near (large, blurry, fast parallax)
-        { stars: [], count: 30, sizeMin: 2.5, sizeMax: 5, speed: 1.2, baseOpacity: [0.15, 0.4] }
+        { stars: [], count: 30, sizeMin: 4.5, sizeMax: 8.0, speed: 1.2, baseOpacity: [0.2, 0.5] }
     ];
 
     const COLORS = ['#FFFDE7', '#E1F5FE', '#F8F8FF', '#CE93D8', '#F48FB1'];
@@ -31,7 +31,7 @@ const Canvas = (() => {
             layer.stars = Array.from({ length: layer.count }, () => ({
                 x: Math.random() * w,
                 y: Math.random() * h,
-                ox: 0, oy: 0, // parallax offset
+                ox: 0, oy: 0,
                 size: _rand(layer.sizeMin, layer.sizeMax),
                 opacity: _rand(layer.baseOpacity[0], layer.baseOpacity[1]),
                 twinkleSpeed: _rand(0.002, 0.008),
@@ -94,8 +94,8 @@ const Canvas = (() => {
 
         const stars = Array.from({ length: 200 }, () => ({
             x: Math.random(), y: Math.random(),
-            size: _rand(0.5, 2.5),
-            opacity: _rand(0.2, 0.8),
+            size: _rand(1.2, 4.5),
+            opacity: _rand(0.25, 0.85),
             twinkleSpeed: _rand(0.001, 0.006),
             twinklePhase: Math.random() * Math.PI * 2,
             color: COLORS[Math.floor(Math.random() * COLORS.length)]
