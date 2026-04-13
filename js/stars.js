@@ -1,10 +1,9 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - stars.js (FIXED & HOÀN CHỈNH)
+   TRẠM GỬI TÍN HIỆU - stars.js
    DOM star dots, signal sending, star popup,
    shooting star event, meteor rain
-   + dispatch 'shootingstar:caught' và 'meteorrain:bonus'
-     để app.js hook ghi vào NotifSystem
-   + Hiển thị số lượng tương tác trên ngôi sao
+   + 3 loại sao mới: shooting / north / cluster
+   + fly animation riêng cho từng loại
    ================================================ */
 
 const Stars = (() => {
@@ -52,9 +51,10 @@ const Stars = (() => {
         } catch { }
     }
 
-    /* ---- CREATE DOM STAR ---- */
+    /* ================================================================
+       CREATE DOM STAR - theo từng type
+       ================================================================ */
     function _createDomStar(data) {
-        // Wrapper để chứa cả star dot + badge
         const wrapper = document.createElement('div');
         wrapper.className = 'star-wrapper';
         wrapper.style.cssText = `
@@ -67,19 +67,64 @@ const Stars = (() => {
 
         const el = document.createElement('div');
         el.className = `star-dot type-${data.type}`;
-        el.style.cssText = `
-            position: absolute;
-            transform: translate(-50%, -50%);
-            width:${data.size}px; height:${data.size}px;
-            opacity:${data.opacity};
-            box-shadow:0 0 ${data.size * 2}px ${data.size}px ${CONFIG.STAR_TYPES[data.type]?.color || '#fff'}55;
-            animation: twinkle ${3 + Math.random() * 4}s ease-in-out infinite;
-            animation-delay:${Math.random() * 4}s;
-        `;
-        if (data.isNegative) el.classList.add('has-react');
-        if (data.tailEffect) el.style.boxShadow += `, -${data.size * 8}px 0 ${data.size * 2}px ${CONFIG.STAR_TYPES[data.type]?.color || '#fff'}33`;
 
-        // Badge ẩn, chỉ dùng để track data — số react hiện trong popup
+        if (data.type === 'north') {
+            const s = data.size || 7;
+            el.style.cssText = `
+                position: absolute;
+                transform: translate(-50%, -50%);
+                width: ${s}px; height: ${s}px;
+                opacity: ${data.opacity || 0.9};
+                background: #fff8c2;
+                clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+                box-shadow: 0 0 ${s * 3}px ${s}px rgba(255,248,194,0.7);
+                animation: twinkle ${2 + Math.random() * 3}s ease-in-out infinite,
+                           northPulse 3s ease-in-out infinite;
+                animation-delay: ${Math.random() * 4}s;
+            `;
+        } else if (data.type === 'cluster') {
+            el.style.cssText = `
+                position: absolute;
+                transform: translate(-50%, -50%);
+                width: 24px; height: 8px;
+                opacity: ${data.opacity || 0.85};
+                background: transparent;
+                animation: twinkle ${3 + Math.random() * 3}s ease-in-out infinite;
+                animation-delay: ${Math.random() * 4}s;
+            `;
+            [-8, 0, 8].forEach((offset, i) => {
+                const sub = document.createElement('span');
+                const subSize = i === 1 ? 5 : 3.5;
+                sub.style.cssText = `
+                    position: absolute;
+                    width: ${subSize}px; height: ${subSize}px;
+                    border-radius: 50%;
+                    background: rgba(212,184,255,${i === 1 ? 0.95 : 0.65});
+                    box-shadow: 0 0 6px rgba(156,125,255,0.6);
+                    top: 50%; left: 50%;
+                    transform: translate(calc(-50% + ${offset}px), -50%);
+                `;
+                el.appendChild(sub);
+            });
+        } else {
+            // shooting
+            const s = data.size || 4;
+            el.style.cssText = `
+                position: absolute;
+                transform: translate(-50%, -50%);
+                width: ${s}px; height: ${s}px;
+                border-radius: 50%;
+                opacity: ${data.opacity || 0.85};
+                background: #a8d8ff;
+                box-shadow: 0 0 ${s * 2}px ${s}px rgba(168,216,255,0.55),
+                            -${s * 6}px 0 ${s * 2}px rgba(168,216,255,0.25);
+                animation: twinkle ${3 + Math.random() * 4}s ease-in-out infinite;
+                animation-delay: ${Math.random() * 4}s;
+            `;
+        }
+
+        if (data.isNegative) el.classList.add('has-react');
+
         const badge = document.createElement('div');
         badge.className = 'star-react-badge';
         badge.style.display = 'none';
@@ -94,9 +139,26 @@ const Stars = (() => {
         container().appendChild(wrapper);
         data._badge = badge;
         data._el = el;
+
+        // TTL: chỉ set nếu có ttl VÀ không permanent
+        const typeConf = CONFIG.STAR_TYPES[data.type];
+        if (typeConf && typeConf.ttl && !typeConf.permanent) {
+            const ttlMs = typeConf.ttl;
+            setTimeout(() => {
+                wrapper.style.transition = 'opacity 1.5s ease';
+                wrapper.style.opacity = '0';
+                setTimeout(() => {
+                    if (wrapper.parentNode) wrapper.remove();
+                    const idx = domStars.findIndex(s => s.el === wrapper);
+                    if (idx !== -1) domStars.splice(idx, 1);
+                }, 1500);
+            }, ttlMs);
+        }
+
         return wrapper;
     }
 
+    /* ---- REACT BADGE ---- */
     function _getTotalReacts(data) {
         const r = data.reactions || {};
         return (r.listen || 0) + (r.hug || 0) + (r.strong || 0);
@@ -144,12 +206,18 @@ const Stars = (() => {
         if (!popup) return;
         document.getElementById('star-popup-text').textContent = data.text;
 
-        // Hiển thị nickname thay vì Anonymous
+        // ── Chỉ hiển thị tên thật nếu ngôi sao là của chính người dùng hiện tại ──
         const anonLabel = popup.querySelector('.anon-label');
         if (anonLabel) {
-            anonLabel.textContent = (data.nickname && data.nickname !== 'Ẩn danh')
-                ? `${data.nickname} ✦`
-                : 'Ẩn danh ✦';
+            const currentNickname = STATE.user?.nickname || STATE.user?.username || '';
+            const starOwner = data.nickname || '';
+            const isOwner = currentNickname &&
+                starOwner &&
+                currentNickname.toLowerCase() === starOwner.toLowerCase();
+
+            anonLabel.textContent = isOwner
+                ? `${starOwner} ✦`   // chủ sao: thấy tên mình
+                : 'Ẩn danh ✦';       // người khác: luôn ẩn danh
         }
 
         const rect = el.getBoundingClientRect();
@@ -161,19 +229,15 @@ const Stars = (() => {
         popup.style.cssText = `left:${left}px; top:${top}px; display:block;`;
         popup.classList.remove('hidden');
 
-        // Render số react hiện tại trong popup
         _renderPopupReacts(data);
 
         popup.querySelectorAll('.react-btn').forEach(btn => {
             btn.onclick = () => {
                 const reaction = btn.dataset.reaction;
-
-                // Cập nhật local
                 if (!data.reactions) data.reactions = {};
                 data.reactions[reaction] = (data.reactions[reaction] || 0) + 1;
                 _updateBadge(data);
 
-                // Hiệu ứng glow trên ngôi sao
                 el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
                 setTimeout(() => { el.style.boxShadow = ''; }, 1200);
 
@@ -193,38 +257,24 @@ const Stars = (() => {
     function _renderPopupReacts(data) {
         const r = data.reactions || {};
         const total = (r.listen || 0) + (r.hug || 0) + (r.strong || 0);
-
-        // Xoá summary cũ nếu có
         const popup = document.getElementById('star-popup');
         popup.querySelectorAll('.react-summary').forEach(el => el.remove());
-
         if (total === 0) return;
 
         const summary = document.createElement('div');
         summary.className = 'react-summary';
         summary.style.cssText = `
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            font-size: 0.72rem;
-            color: rgba(255,255,255,0.55);
-            margin-top: 6px;
-            margin-bottom: -4px;
+            display:flex; gap:10px; justify-content:center;
+            font-size:0.72rem; color:rgba(255,255,255,0.55);
+            margin-top:6px; margin-bottom:-4px;
         `;
-        const items = [
-            { key: 'listen', icon: '🕯️' },
-            { key: 'hug', icon: '❤️' },
-            { key: 'strong', icon: '⚡' },
-        ];
-        items.forEach(({ key, icon }) => {
+        [{ key: 'listen', icon: '🕯️' }, { key: 'hug', icon: '❤️' }, { key: 'strong', icon: '⚡' }].forEach(({ key, icon }) => {
             const count = r[key] || 0;
-            if (count === 0) return;
+            if (!count) return;
             const span = document.createElement('span');
             span.textContent = `${icon} ${count}`;
             summary.appendChild(span);
         });
-
-        // Chèn vào trên react-btns
         const reactBtns = popup.querySelector('.reaction-btns');
         if (reactBtns) popup.insertBefore(summary, reactBtns);
     }
@@ -262,8 +312,7 @@ const Stars = (() => {
                 if (s.y == null) s.y = 5 + Math.random() * 70;
                 if (!s.size) s.size = 3 + Math.random() * 5;
                 if (!s.opacity) s.opacity = 0.5 + Math.random() * 0.5;
-                if (!CONFIG.STAR_TYPES[s.type]) s.type = 'normal';
-                // Map listenCount/hugCount/strongCount → reactions object
+                if (!CONFIG.STAR_TYPES[s.type]) s.type = 'shooting';
                 s.reactions = {
                     listen: s.listenCount || 0,
                     hug: s.hugCount || 0,
@@ -274,7 +323,9 @@ const Stars = (() => {
             });
         } catch (err) {
             console.warn('loadStars error, dùng demo stars:', err);
-            _addDemoStars();
+            if (domStars.length === 0) {
+                _addDemoStars();
+            }
         }
     }
 
@@ -282,16 +333,16 @@ const Stars = (() => {
         domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
         domStars = [];
         const demos = [
-            { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'normal', isNegative: true, reactions: { listen: 3, hug: 1 } },
-            { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'bright', isNegative: false, reactions: { strong: 2 } },
-            { id: 3, text: 'Tiếng mưa buổi sáng thật bình yên 🌧️', type: 'shooting', isNegative: false, reactions: {} },
-            { id: 4, text: 'Muốn được ngủ đủ giấc một lần thôi...', type: 'normal', isNegative: true, reactions: { hug: 5 } },
-            { id: 5, text: 'Bầu trời đêm nay đẹp không ai ơi 🌙', type: 'bright', isNegative: false, reactions: {} },
-            { id: 6, text: 'Nhớ nhà quá, xa nhà được 3 tháng rồi', type: 'normal', isNegative: true, reactions: { listen: 2, hug: 4 } },
+            { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'shooting', isNegative: true, reactions: { listen: 3, hug: 1 } },
+            { id: 2, text: 'Vừa đậu đại học! Nhưng cảm thấy áp lực quá 😅', type: 'north', isNegative: false, reactions: { strong: 2 } },
+            { id: 3, text: 'Tiếng mưa buổi sáng thật bình yên 🌧️', type: 'cluster', isNegative: false, reactions: {} },
+            { id: 4, text: 'Muốn được ngủ đủ giấc một lần thôi...', type: 'shooting', isNegative: true, reactions: { hug: 5 } },
+            { id: 5, text: 'Bầu trời đêm nay đẹp không ai ơi 🌙', type: 'north', isNegative: false, reactions: {} },
+            { id: 6, text: 'Nhớ nhà quá, xa nhà được 3 tháng rồi', type: 'cluster', isNegative: true, reactions: { listen: 2, hug: 4 } },
             { id: 7, text: 'Cuối cùng cũng hoàn thành project ✨', type: 'shooting', isNegative: false, reactions: { strong: 7 } },
-            { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'normal', isNegative: true, reactions: { listen: 1 } },
-            { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'bright', isNegative: false, reactions: {} },
-            { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'normal', isNegative: false, reactions: { hug: 12, listen: 3 } },
+            { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'cluster', isNegative: true, reactions: { listen: 1 } },
+            { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'north', isNegative: false, reactions: {} },
+            { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'north', isNegative: false, reactions: { hug: 12, listen: 3 } },
         ];
         demos.forEach(d => {
             const s = {
@@ -304,6 +355,213 @@ const Stars = (() => {
     }
 
     /* ================================================================
+       FLY ANIMATIONS - 3 loại sao bay khác nhau
+       ================================================================ */
+
+    function _flyShootingStar(startX, startY, targetX, targetY, onDone) {
+        const W = window.innerWidth, H = window.innerHeight;
+        const cv = document.createElement('canvas');
+        cv.style.cssText = `position:fixed;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:500;`;
+        cv.width = W; cv.height = H;
+        document.body.appendChild(cv);
+        const ctx = cv.getContext('2d');
+
+        const dx = targetX - startX, dy = targetY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const steps = Math.ceil(dist / 3.8);
+        let step = 0;
+        const trail = [];
+
+        function frame() {
+            ctx.clearRect(0, 0, W, H);
+            const progress = step / steps;
+            const x = startX + dx * progress;
+            const y = startY + dy * progress;
+
+            trail.push({ x, y });
+            if (trail.length > 28) trail.shift();
+
+            trail.forEach((pt, i) => {
+                const a = (i / trail.length) * 0.65;
+                ctx.fillStyle = `rgba(168,216,255,${a})`;
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            for (let k = 0; k < 3; k++) {
+                ctx.fillStyle = 'rgba(168,216,255,0.4)';
+                ctx.beginPath();
+                ctx.arc(x + (Math.random() - 0.5) * 12, y + (Math.random() - 0.5) * 8, Math.random() * 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const rg = ctx.createRadialGradient(x, y, 0, x, y, 9);
+            rg.addColorStop(0, '#ffffff');
+            rg.addColorStop(0.5, '#a8d8ff');
+            rg.addColorStop(1, 'rgba(168,216,255,0)');
+            ctx.fillStyle = rg;
+            ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+
+            step++;
+            if (step <= steps) {
+                requestAnimationFrame(frame);
+            } else {
+                let alpha = 1;
+                (function fade() {
+                    ctx.clearRect(0, 0, W, H);
+                    alpha -= 0.08;
+                    ctx.globalAlpha = Math.max(0, alpha);
+                    const rg2 = ctx.createRadialGradient(targetX, targetY, 0, targetX, targetY, 14);
+                    rg2.addColorStop(0, '#fff'); rg2.addColorStop(1, 'rgba(168,216,255,0)');
+                    ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(targetX, targetY, 14, 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1;
+                    if (alpha > 0) requestAnimationFrame(fade);
+                    else { cv.remove(); onDone && onDone(); }
+                })();
+            }
+        }
+        requestAnimationFrame(frame);
+    }
+
+    function _flyNorthStar(startX, startY, targetX, targetY, onDone) {
+        const W = window.innerWidth, H = window.innerHeight;
+        const cv = document.createElement('canvas');
+        cv.style.cssText = `position:fixed;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:500;`;
+        cv.width = W; cv.height = H;
+        document.body.appendChild(cv);
+        const ctx = cv.getContext('2d');
+
+        const dx = targetX - startX, dy = targetY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const steps = Math.ceil(dist / 1.1);
+        let step = 0, t = 0;
+
+        function frame() {
+            ctx.clearRect(0, 0, W, H);
+            const progress = step / steps;
+            const x = startX + dx * progress;
+            const y = startY + dy * progress;
+            const pulse = 1 + 0.12 * Math.sin(t * 0.08);
+            t++;
+
+            const og = ctx.createRadialGradient(x, y, 0, x, y, 22 * pulse);
+            og.addColorStop(0, 'rgba(255,248,194,0.5)'); og.addColorStop(1, 'rgba(255,248,194,0)');
+            ctx.fillStyle = og; ctx.beginPath(); ctx.arc(x, y, 22 * pulse, 0, Math.PI * 2); ctx.fill();
+
+            const r1 = 11 * pulse, r2 = 3.5;
+            ctx.fillStyle = '#fff8c2';
+            ctx.beginPath();
+            for (let i = 0; i < 4; i++) {
+                const a = (i * Math.PI / 2) - Math.PI / 2;
+                const a2 = a + Math.PI / 4;
+                if (i === 0) ctx.moveTo(x + r1 * Math.cos(a), y + r1 * Math.sin(a));
+                else ctx.lineTo(x + r1 * Math.cos(a), y + r1 * Math.sin(a));
+                ctx.lineTo(x + r2 * Math.cos(a2), y + r2 * Math.sin(a2));
+            }
+            ctx.closePath(); ctx.fill();
+
+            step++;
+            if (step <= steps) {
+                requestAnimationFrame(frame);
+            } else {
+                let alpha = 1.2;
+                (function burst() {
+                    ctx.clearRect(0, 0, W, H);
+                    alpha -= 0.055;
+                    if (alpha <= 0) { cv.remove(); onDone && onDone(); return; }
+                    ctx.globalAlpha = Math.min(1, alpha);
+                    const gr = ctx.createRadialGradient(targetX, targetY, 0, targetX, targetY, 28 * (1.2 - alpha));
+                    gr.addColorStop(0, '#ffffff');
+                    gr.addColorStop(0.4, 'rgba(255,248,194,0.7)');
+                    gr.addColorStop(1, 'rgba(255,248,194,0)');
+                    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(targetX, targetY, 28 * (1.2 - alpha), 0, Math.PI * 2); ctx.fill();
+                    ctx.globalAlpha = 1;
+                    requestAnimationFrame(burst);
+                })();
+            }
+        }
+        requestAnimationFrame(frame);
+    }
+
+    function _flyClusterStar(startX, startY, targetX, targetY, onDone) {
+        const W = window.innerWidth, H = window.innerHeight;
+        const cv = document.createElement('canvas');
+        cv.style.cssText = `position:fixed;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:500;`;
+        cv.width = W; cv.height = H;
+        document.body.appendChild(cv);
+        const ctx = cv.getContext('2d');
+
+        const dx = targetX - startX, dy = targetY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const steps = Math.ceil(dist / 2.2);
+        let step = 0;
+
+        const OFFSETS = [0, -22, -44];
+        const SIZES = [6, 4.5, 3.5];
+        const ALPHAS = [0.95, 0.7, 0.5];
+
+        function frame() {
+            ctx.clearRect(0, 0, W, H);
+            const progress = step / steps;
+            const baseX = startX + dx * progress;
+            const baseY = startY + dy * progress;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const ux = dx / len, uy = dy / len;
+
+            OFFSETS.forEach((off, i) => {
+                const px = baseX + ux * off;
+                const py = baseY + uy * off;
+                const r = SIZES[i], alpha = ALPHAS[i];
+
+                const rg = ctx.createRadialGradient(px, py, 0, px, py, r * 2.8);
+                rg.addColorStop(0, `rgba(212,184,255,${alpha})`);
+                rg.addColorStop(1, 'rgba(156,125,255,0)');
+                ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(px, py, r * 2.8, 0, Math.PI * 2); ctx.fill();
+
+                ctx.fillStyle = `rgba(212,184,255,${alpha})`;
+                ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+
+                for (let k = 0; k < 3; k++) {
+                    const angle = (k / 3) * Math.PI * 2 + step * 0.04;
+                    ctx.fillStyle = `rgba(212,184,255,${alpha * 0.45})`;
+                    ctx.beginPath();
+                    ctx.arc(px + r * 1.8 * Math.cos(angle), py + r * 1.8 * Math.sin(angle), r * 0.35, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+
+            const tail = { x: baseX + ux * OFFSETS[2], y: baseY + uy * OFFSETS[2] };
+            ctx.strokeStyle = 'rgba(156,125,255,0.25)';
+            ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+            ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tail.x, tail.y); ctx.stroke();
+            ctx.setLineDash([]);
+
+            step++;
+            if (step <= steps) {
+                requestAnimationFrame(frame);
+            } else {
+                let alpha2 = 1;
+                (function disperse() {
+                    ctx.clearRect(0, 0, W, H);
+                    alpha2 -= 0.065;
+                    if (alpha2 <= 0) { cv.remove(); onDone && onDone(); return; }
+                    ctx.globalAlpha = alpha2;
+                    const spread = (1 - alpha2) * 20;
+                    [[0, -spread], [-spread, spread * 0.8], [spread, spread * 0.8]].forEach(([ox, oy]) => {
+                        const rg2 = ctx.createRadialGradient(targetX + ox, targetY + oy, 0, targetX + ox, targetY + oy, 10);
+                        rg2.addColorStop(0, 'rgba(212,184,255,0.8)'); rg2.addColorStop(1, 'rgba(156,125,255,0)');
+                        ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(targetX + ox, targetY + oy, 10, 0, Math.PI * 2); ctx.fill();
+                    });
+                    ctx.globalAlpha = 1;
+                    requestAnimationFrame(disperse);
+                })();
+            }
+        }
+        requestAnimationFrame(frame);
+    }
+
+    /* ================================================================
        SEND SIGNAL
        ================================================================ */
     async function sendSignal(text, type, showHeal = true) {
@@ -312,40 +570,69 @@ const Stars = (() => {
         if (typeof Sound !== 'undefined') Sound.playBell();
         if (showHeal && typeof HealToast !== 'undefined') HealToast.show();
 
-        const validType = CONFIG.STAR_TYPES[type] ? type : 'normal';
-        const x = 10 + Math.random() * 78;
-        const y = 5 + Math.random() * 60;
+        const validType = CONFIG.STAR_TYPES[type] ? type : 'shooting';
+
+        const W = window.innerWidth;
+        const H = window.innerHeight;
+
+        const SAFE_TOP = 74;
+        const SAFE_BOTTOM = H * 0.5 - 120;
+        const SAFE_LEFT = W * 0.05;
+        const SAFE_RIGHT = W * 0.94;
+
+        const flyTargetX = SAFE_LEFT + Math.random() * (SAFE_RIGHT - SAFE_LEFT);
+        const flyTargetY = SAFE_TOP + Math.random() * (SAFE_BOTTOM - SAFE_TOP);
+
+        const mainScreen = document.getElementById('main-screen');
+        const screenW = mainScreen ? mainScreen.offsetWidth : W;
+        const screenH = mainScreen ? mainScreen.offsetHeight : H;
+        const mainRect = mainScreen ? mainScreen.getBoundingClientRect() : { left: 0, top: 0 };
+
+        const xPct = ((flyTargetX - mainRect.left) / screenW) * 100;
+        const yPct = ((flyTargetY - mainRect.top) / screenH) * 100;
+
         const sizeRange = CONFIG.STAR_TYPES[validType].size;
         const starSize = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
-        const hasTrail = STATE.unlocked && !!STATE.unlocked['trail_star'];
-        const hasHalo = STATE.unlocked && !!STATE.unlocked['halo_star'];
 
-        _animateSignalFly(x, y, async () => {
+        const sendBtn = document.getElementById('btn-send');
+        const btnRect = sendBtn ? sendBtn.getBoundingClientRect() : null;
+        const startX = btnRect ? btnRect.left + btnRect.width / 2 : W / 2;
+        const startY = btnRect ? btnRect.top : H * 0.65;
+
+        const flyFn = validType === 'north' ? _flyNorthStar
+            : validType === 'cluster' ? _flyClusterStar
+                : _flyShootingStar;
+
+        flyFn(startX, startY, flyTargetX, flyTargetY, async () => {
             const data = {
-                id: null, text, type: validType, x, y, size: starSize, opacity: 0.85,
-                isNegative: _isNegative(text), tailEffect: hasTrail, haloEffect: hasHalo,
-                reactions: {}
+                id: null,
+                text,
+                type: validType,
+                x: xPct,
+                y: yPct,
+                size: starSize,
+                opacity: 0.85,
+                isNegative: _isNegative(text),
+                reactions: {},
+                // Lưu nickname của người gửi vào data của ngôi sao
+                nickname: STATE.user?.nickname || STATE.user?.username || ''
             };
-            const id = await _postStar(text, validType, x, y);
-            if (id) data.id = id;
+
             const el = _createDomStar(data);
             domStars.push({ el, data });
+
+            el.style.opacity = '0';
+            el.style.transition = 'opacity 0.6s ease';
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => { el.style.opacity = '1'; });
+            });
+
+            const id = await _postStar(text, validType, xPct, yPct);
+            if (id) data.id = id;
+
             await _syncPointsFromServer();
             UI.updateHUD();
         });
-    }
-
-    function _animateSignalFly(targetX, targetY, onDone) {
-        const panel = document.getElementById('input-panel');
-        if (!panel) { onDone && onDone(); return; }
-        const rect = panel.getBoundingClientRect();
-        const cx = rect.left + rect.width / 2;
-        const cy = rect.top + rect.height / 2;
-        const particle = document.createElement('div');
-        particle.className = 'signal-particle';
-        particle.style.cssText = `left:${cx - 4}px; top:${cy - 4}px;`;
-        document.body.appendChild(particle);
-        setTimeout(() => { particle.remove(); onDone && onDone(); }, 1500);
     }
 
     async function _postStar(text, type, x, y) {
@@ -356,7 +643,7 @@ const Stars = (() => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${STATE.user?.token}`
                 },
-                body: JSON.stringify({ text, type, x, y, nickname: STATE.user?.nickname || 'Ẩn danh' })
+                body: JSON.stringify({ text, type, x, y, nickname: STATE.user?.nickname || STATE.user?.username || 'Ẩn danh' })
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -368,7 +655,7 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       SHOOTING STAR
+       SHOOTING STAR (mini game bắt sao)
        ================================================================ */
     function _isShootingStarDone() {
         return !!(STATE.dailyMissions && STATE.dailyMissions['shooting_star_done']);
@@ -406,10 +693,8 @@ const Stars = (() => {
             animation: shootingMeteor ${METEOR_DURATION}ms cubic-bezier(0.18, 0.05, 0.42, 1) forwards;
         `;
 
-        const tail = document.createElement('div');
-        tail.className = 'shooting-star-tail';
-        const glow = document.createElement('div');
-        glow.className = 'shooting-star-glow';
+        const tail = document.createElement('div'); tail.className = 'shooting-star-tail';
+        const glow = document.createElement('div'); glow.className = 'shooting-star-glow';
         const head = document.createElement('div');
         head.className = 'shooting-star-head';
         head.style.pointerEvents = 'all';
@@ -446,7 +731,6 @@ const Stars = (() => {
             UI.showToast(`🌠 Bạn đã bắt được sao băng! +${CONFIG.POINTS.SHOOTING_STAR} ✨`);
             if (typeof Sound !== 'undefined') Sound.playSinewave(880);
             UI.updateHUD();
-
             document.dispatchEvent(new CustomEvent('shootingstar:caught'));
         };
 
@@ -464,12 +748,11 @@ const Stars = (() => {
 
     function _spawnCatchEffect(wrapper) {
         const rect = wrapper.getBoundingClientRect();
-        const cx = rect.left;
-        const cy = rect.top;
+        const cx = rect.left, cy = rect.top;
 
         const ring = document.createElement('div');
         ring.className = 'points-ring';
-        ring.style.cssText = `left:${cx}px; top:${cy}px; transform: translate(-50%,-50%);`;
+        ring.style.cssText = `left:${cx}px; top:${cy}px; transform:translate(-50%,-50%);`;
         document.body.appendChild(ring);
         setTimeout(() => ring.remove(), 800);
 
@@ -483,7 +766,7 @@ const Stars = (() => {
                     width:${size}px; height:${size}px;
                     left:${cx + (-40 + Math.random() * 80)}px;
                     top:${cy + (-20 + Math.random() * 40)}px;
-                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    background:${colors[Math.floor(Math.random() * colors.length)]};
                     --dx:${-120 + Math.random() * 240}px;
                     --dy:${-140 - Math.random() * 100}px;
                 `;
@@ -503,7 +786,6 @@ const Stars = (() => {
         UI.addPoints(30);
         await _pushPointsToServer(30);
         UI.updateHUD();
-
         document.dispatchEvent(new CustomEvent('meteorrain:bonus'));
 
         const screen = document.getElementById('main-screen');

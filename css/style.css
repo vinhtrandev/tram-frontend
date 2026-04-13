@@ -1,8 +1,8 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - style.css (FULL v3)
-   + .void-effect-badge — badge tên hiệu ứng ngẫu nhiên
-   + #heal-toast — toast an ủi riêng cho hố đen
-   + .void-ripple-fx — helper class cho ripple effect
+   TRẠM GỬI TÍN HIỆU - style.css (FULL v4)
+   + Hố Đen redesign — gravitational lensing
+   + Profile pill + shimmer effect
+   + .void-effect-badge, #heal-toast, .void-ripple-fx
    ================================================ */
 
 :root {
@@ -337,7 +337,9 @@ canvas {
     background: radial-gradient(ellipse at 50% 10%, #1A1B2E 0%, #080B12 65%);
 }
 
-/* ---- TOP NAVBAR ---- */
+/* ==============================
+   TOP NAVBAR
+   ============================== */
 .top-navbar {
     position: fixed;
     top: 0;
@@ -404,47 +406,185 @@ canvas {
     background: rgba(255, 255, 255, .07);
 }
 
+/* ── Nav right + profile pill ── */
 .nav-right {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-shrink: 0;
 }
 
 .nav-user {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     gap: 1px;
+    padding: 8px 16px 8px 14px;
+    border-radius: 50px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(160, 100, 255, 0.18);
+    overflow: hidden;
+    transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.nav-user:hover {
+    background: rgba(160, 100, 255, 0.07);
+    border-color: rgba(180, 120, 255, 0.32);
+}
+
+/* Vệt sáng chạy qua profile */
+.nav-user::before {
+    content: '';
+    position: absolute;
+    top: -60%;
+    left: -90%;
+    width: 55%;
+    height: 220%;
+    background: linear-gradient(105deg,
+            transparent 0%,
+            rgba(200, 160, 255, 0.05) 30%,
+            rgba(225, 185, 255, 0.18) 50%,
+            rgba(200, 160, 255, 0.05) 70%,
+            transparent 100%);
+    transform: skewX(-15deg);
+    animation: navShimmer 4s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes navShimmer {
+    0% {
+        left: -90%;
+        opacity: 0;
+    }
+
+    8% {
+        opacity: 1;
+    }
+
+    55% {
+        left: 150%;
+        opacity: 1;
+    }
+
+    60% {
+        opacity: 0;
+    }
+
+    100% {
+        left: 150%;
+        opacity: 0;
+    }
 }
 
 .nav-nickname {
-    font-size: .85rem;
+    font-size: .82rem;
     font-weight: 600;
-    color: var(--accent-purple);
+    color: rgba(230, 210, 255, 0.92);
+    letter-spacing: 0.05em;
+    line-height: 1.2;
 }
 
 .nav-points {
-    font-size: .72rem;
-    color: var(--accent-gold);
+    font-size: .68rem;
+    color: rgba(200, 170, 255, 0.58);
+    letter-spacing: 0.03em;
+    line-height: 1.2;
+}
+
+#user-points {
+    color: #f0d060;
+    text-shadow: 0 0 8px rgba(240, 200, 60, 0.5);
+    font-weight: 700;
+}
+
+/* ── Bell ── */
+.nav-bell-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
 }
 
 .nav-bell {
-    background: none;
-    border: none;
-    font-size: 1.1rem;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(160, 100, 255, 0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
     cursor: pointer;
-    color: var(--text-dim);
     transition: var(--transition);
+    color: rgba(200, 170, 255, 0.7);
+    padding: 0;
+    line-height: 1;
 }
 
 .nav-bell:hover {
+    background: rgba(160, 100, 255, 0.12);
+    border-color: rgba(180, 120, 255, 0.38);
+    transform: scale(1.08);
     color: var(--accent-gold);
 }
 
+.bell-badge {
+    position: absolute;
+    top: -4px;
+    right: -6px;
+    background: #e45c7a;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    pointer-events: none;
+    animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.bell-badge.hidden {
+    display: none;
+}
+
+@keyframes badge-pop {
+    from {
+        transform: scale(0);
+    }
+
+    to {
+        transform: scale(1);
+    }
+}
+
+/* ── Logout ── */
 .nav-logout {
-    padding: 7px 14px;
-    font-size: .8rem;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(160, 100, 255, 0.15);
+    color: rgba(180, 140, 220, 0.6);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    padding: 0;
+    line-height: 1;
+}
+
+.nav-logout:hover {
+    background: rgba(220, 80, 80, 0.1);
+    border-color: rgba(220, 80, 120, 0.35);
+    color: rgba(255, 140, 160, 0.8);
+    transform: scale(1.08);
 }
 
 .hud-btn {
@@ -466,7 +606,9 @@ canvas {
     box-shadow: 0 0 20px rgba(206, 147, 216, .15);
 }
 
-/* ---- CENTER INPUT AREA ---- */
+/* ==============================
+   CENTER INPUT AREA
+   ============================== */
 .center-input-area {
     position: fixed;
     top: 50%;
@@ -534,6 +676,7 @@ canvas {
 .star-type-selector {
     display: flex;
     gap: 6px;
+    align-items: center;
 }
 
 .star-type {
@@ -555,6 +698,34 @@ canvas {
     background: rgba(206, 147, 216, .15);
 }
 
+.star-type-btn {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    overflow: visible;
+    padding: 0;
+}
+
+.star-type-btn:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.star-type-btn canvas {
+    width: 28px;
+    height: 28px;
+    pointer-events: none;
+    display: block;
+}
+
 .btn-send {
     padding: 8px 22px;
     border-radius: 22px;
@@ -574,7 +745,9 @@ canvas {
     transform: scale(1.03);
 }
 
-/* ---- VOID (bottom left) ---- */
+/* ==============================
+   HỐ ĐEN — Gravitational lensing redesign
+   ============================== */
 .void-container {
     position: fixed;
     bottom: 160px;
@@ -583,92 +756,258 @@ canvas {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    position: relative;
+    gap: 10px;
 }
 
 .void-label {
     font-size: .68rem;
-    color: var(--text-dim);
-    letter-spacing: .12em;
+    letter-spacing: .14em;
+    color: rgba(180, 160, 220, 0.55);
     text-transform: uppercase;
 }
 
 .void {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #0d0020 0%, #1A1B2E 60%, transparent 100%);
-    box-shadow: 0 0 30px rgba(74, 0, 130, .4), inset 0 0 20px rgba(74, 0, 130, .3);
-    cursor: pointer;
     position: relative;
-    overflow: hidden;
-    transition: var(--transition);
+    width: 110px;
+    height: 110px;
+    cursor: pointer;
+    border-radius: 50%;
 }
 
-.void:hover {
-    box-shadow: 0 0 50px rgba(206, 147, 216, .4), inset 0 0 30px rgba(74, 0, 130, .5);
+/* Lớp glow ngoài — gravitational lensing halo */
+.void-glow-outer {
+    position: absolute;
+    inset: -18px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at center,
+            transparent 38%,
+            rgba(120, 70, 200, 0.04) 50%,
+            rgba(160, 100, 255, 0.13) 62%,
+            rgba(200, 140, 255, 0.22) 70%,
+            rgba(180, 120, 240, 0.12) 78%,
+            transparent 90%);
+    pointer-events: none;
+    animation: voidRotateOuter 18s linear infinite;
 }
 
+/* Đĩa bồi tụ — accretion disk */
+.void-accretion {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: conic-gradient(from 200deg,
+            transparent 0%,
+            rgba(160, 80, 255, 0.0) 10%,
+            rgba(200, 120, 255, 0.25) 20%,
+            rgba(230, 160, 255, 0.45) 28%,
+            rgba(255, 200, 255, 0.35) 33%,
+            rgba(200, 140, 255, 0.2) 40%,
+            transparent 55%,
+            rgba(120, 60, 200, 0.08) 70%,
+            rgba(150, 90, 220, 0.18) 80%,
+            rgba(180, 110, 240, 0.3) 88%,
+            rgba(160, 90, 230, 0.15) 95%,
+            transparent 100%);
+    pointer-events: none;
+    animation: voidAccretionSpin 9s linear infinite;
+}
+
+/* Photon ring — vành sáng mỏng */
+.void-photon-ring {
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    background:
+        radial-gradient(ellipse at 30% 25%, rgba(230, 180, 255, 0.7) 0%, transparent 40%) border-box,
+        radial-gradient(ellipse at 70% 75%, rgba(140, 80, 255, 0.4) 0%, transparent 40%) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: voidPhotonSpin 6s linear infinite;
+}
+
+/* Quả cầu đen trung tâm */
+.void-shadow {
+    position: absolute;
+    inset: 20px;
+    border-radius: 50%;
+    background: radial-gradient(ellipse at 38% 36%,
+            #16102a 0%,
+            #0c0818 40%,
+            #050410 70%,
+            #020208 100%);
+    box-shadow:
+        0 0 0 1px rgba(100, 60, 180, 0.15),
+        inset 0 0 30px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+}
+
+/* Vòng xoáy bên trong */
+.void-spiral {
+    position: absolute;
+    inset: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(120, 70, 200, 0.12);
+    pointer-events: none;
+    animation: voidSpiralSpin 12s linear infinite reverse;
+}
+
+.void-spiral::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    border: 1px solid rgba(160, 100, 240, 0.08);
+}
+
+/* Điểm sáng trung tâm */
 .void-core {
     position: absolute;
-    inset: 25px;
+    inset: 0;
     border-radius: 50%;
-    background: radial-gradient(circle, #050010 0%, transparent 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.void-core::after {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: rgba(220, 180, 255, 0.6);
+    box-shadow: 0 0 8px rgba(200, 140, 255, 0.8), 0 0 20px rgba(160, 80, 255, 0.4);
+    animation: corePulse 3s ease-in-out infinite;
 }
 
 .void-hint {
     font-size: .66rem;
     color: var(--text-dim);
     text-align: center;
-    max-width: 90px;
+    max-width: 100px;
     line-height: 1.4;
 }
 
+/* Timer overlay */
 .void-timer {
     position: absolute;
     top: 0;
     left: 0;
-    width: 80px;
-    height: 80px;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .void-timer svg {
-    width: 80px;
-    height: 80px;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     transform: rotate(-90deg);
 }
 
 .timer-track {
     fill: none;
-    stroke: rgba(255, 255, 255, .1);
-    stroke-width: 3;
+    stroke: rgba(200, 140, 255, 0.12);
+    stroke-width: 2;
 }
 
 .timer-progress {
     fill: none;
-    stroke: var(--accent-purple);
-    stroke-width: 3;
+    stroke: rgba(200, 140, 255, 0.7);
+    stroke-width: 2;
     stroke-linecap: round;
     stroke-dasharray: 163;
     stroke-dashoffset: 163;
-    transition: stroke-dashoffset 1s linear;
+    transition: stroke-dashoffset 0.1s linear;
 }
 
 #void-count {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
+    z-index: 3;
     font-size: 1rem;
-    font-weight: 600;
-    color: var(--accent-purple);
+    font-weight: 700;
+    color: rgba(220, 180, 255, 0.9);
+    font-family: var(--font-body);
+}
+
+/* ── Void animations ── */
+@keyframes voidRotateOuter {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes voidAccretionSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes voidPhotonSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes voidSpiralSpin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes corePulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.6);
+    }
+}
+
+@keyframes voidFlash {
+    0% {
+        filter: brightness(1);
+    }
+
+    50% {
+        filter: brightness(2.5);
+    }
+
+    100% {
+        filter: brightness(1);
+    }
 }
 
 /* ==============================
    VOID HEAL TOAST
-   Toast an ủi riêng cho hố đen
    ============================== */
 #heal-toast {
     position: fixed;
@@ -709,7 +1048,6 @@ canvas {
 
 /* ==============================
    VOID EFFECT BADGE
-   Badge tên hiệu ứng ngẫu nhiên, góc trên phải
    ============================== */
 #void-effect-badge {
     position: fixed;
@@ -745,8 +1083,6 @@ canvas {
 
 /* ==============================
    VOID RIPPLE FX
-   Helper class — không cần animation CSS
-   vì đã set inline animation string từ JS
    ============================== */
 .void-ripple-fx {
     position: fixed;
@@ -755,7 +1091,9 @@ canvas {
     z-index: 999;
 }
 
-/* ---- SOUND PANEL (bottom right) ---- */
+/* ==============================
+   SOUND PANEL
+   ============================== */
 .sound-panel {
     position: fixed;
     bottom: 28px;
@@ -773,6 +1111,51 @@ canvas {
     color: var(--accent-purple);
     font-weight: 600;
     letter-spacing: .06em;
+}
+
+.bgm-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.bgm-row-label {
+    font-size: 0.68rem;
+    color: rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+}
+
+#bgm-toggle-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    transition: all 0.3s ease;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+#bgm-toggle-btn:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+#bgm-toggle-btn.active {
+    background: rgba(138, 100, 255, 0.25);
+    border-color: rgba(138, 100, 255, 0.6);
+    color: #c9b8ff;
+    box-shadow: 0 0 8px rgba(138, 100, 255, 0.3);
+}
+
+.sound-divider {
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 4px 0;
 }
 
 .sound-btns {
@@ -805,7 +1188,9 @@ canvas {
     border-color: rgba(206, 147, 216, .3);
 }
 
-/* ---- SIDE PANELS ---- */
+/* ==============================
+   SIDE PANELS
+   ============================== */
 .side-panel {
     position: fixed;
     top: calc(var(--navbar-h) + 12px);
@@ -1088,7 +1473,9 @@ canvas {
     color: var(--accent-purple);
 }
 
-/* BREATHING */
+/* ==============================
+   BREATHING
+   ============================== */
 .breathing-overlay {
     position: fixed;
     inset: 0;
@@ -1137,7 +1524,9 @@ canvas {
     color: var(--text-main);
 }
 
-/* STAR POPUP */
+/* ==============================
+   STAR POPUP
+   ============================== */
 .star-popup {
     position: fixed;
     z-index: 300;
@@ -1216,7 +1605,9 @@ canvas {
     text-align: center;
 }
 
-/* TOAST */
+/* ==============================
+   TOAST
+   ============================== */
 .toast-container {
     position: fixed;
     top: calc(var(--navbar-h) + 12px);
@@ -1243,52 +1634,9 @@ canvas {
     box-shadow: 0 0 30px rgba(206, 147, 216, .15);
 }
 
-/* ASTRONAUT TIMER */
-.astronaut-timer {
-    position: fixed;
-    bottom: 160px;
-    right: 28px;
-    z-index: 100;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    padding: 12px 16px;
-}
-
-.astro-icon {
-    font-size: 1.5rem;
-}
-
-.astro-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: .78rem;
-    color: var(--text-dim);
-}
-
-.astro-progress-bar {
-    height: 3px;
-    width: 120px;
-    background: rgba(255, 255, 255, .08);
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-#astro-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, var(--accent-purple), var(--accent-pink));
-    transition: width 1s linear;
-}
-
-#astro-time {
-    font-size: .85rem;
-    color: var(--accent-purple);
-    font-weight: 600;
-}
-
-/* SHOOTING STAR HINT */
+/* ==============================
+   SHOOTING STAR HINT
+   ============================== */
 .shooting-star-hint {
     position: fixed;
     top: 50%;
@@ -1306,12 +1654,277 @@ canvas {
     pointer-events: none;
 }
 
-/* LEGACY (hidden, kept for JS compat) */
+/* ==============================
+   NOTIFICATION PANEL
+   ============================== */
+.notif-panel {
+    position: fixed;
+    top: 62px;
+    right: 16px;
+    width: 320px;
+    max-height: calc(100vh - 80px);
+    z-index: 300;
+    border-radius: 16px;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
+    animation: panel-drop 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+.notif-panel.hidden {
+    display: none !important;
+}
+
+@keyframes panel-drop {
+    from {
+        opacity: 0;
+        transform: translateY(-12px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.notif-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+}
+
+.notif-panel-header h3 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    letter-spacing: 0.02em;
+}
+
+.notif-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 12px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+}
+
+.notif-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: center;
+}
+
+.notif-summary-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.notif-summary-item div {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+
+.notif-summary-val {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.notif-summary-item.earned .notif-summary-val {
+    color: #a8f5c4;
+}
+
+.notif-summary-item.spent .notif-summary-val {
+    color: #f5c4a8;
+}
+
+.notif-summary-item.balance .notif-summary-val {
+    color: #c9b8ff;
+}
+
+.notif-summary-lbl {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.38);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.notif-summary-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
+
+.notif-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.notif-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px 20px;
+    gap: 10px;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.8rem;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.notif-empty span {
+    font-size: 2rem;
+}
+
+.notif-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+    animation: notif-slide 0.25s ease;
+}
+
+@keyframes notif-slide {
+    from {
+        opacity: 0;
+        transform: translateX(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.notif-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.notif-item:last-child {
+    border-bottom: none;
+}
+
+.notif-item-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.notif-item.type-earn .notif-item-icon {
+    background: rgba(168, 245, 196, 0.15);
+}
+
+.notif-item.type-spend .notif-item-icon {
+    background: rgba(245, 196, 168, 0.15);
+}
+
+.notif-item.type-bonus .notif-item-icon {
+    background: rgba(201, 184, 255, 0.15);
+}
+
+.notif-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-item-desc {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+.notif-item-time {
+    font-size: 0.62rem;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.notif-item-amount {
+    font-size: 0.88rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.notif-item.type-earn .notif-item-amount {
+    color: #a8f5c4;
+}
+
+.notif-item.type-spend .notif-item-amount {
+    color: #f5c4a8;
+}
+
+.notif-item.type-bonus .notif-item-amount {
+    color: #c9b8ff;
+}
+
+.notif-clear-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 0.72rem;
+    padding: 10px;
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.notif-clear-btn:hover {
+    color: #e45c7a;
+    background: rgba(228, 92, 122, 0.06);
+}
+
+/* ── North star pulse ── */
+@keyframes northPulse {
+
+    0%,
+    100% {
+        filter: brightness(1) drop-shadow(0 0 4px rgba(255, 248, 194, 0.5));
+    }
+
+    50% {
+        filter: brightness(1.3) drop-shadow(0 0 10px rgba(255, 248, 194, 0.9));
+    }
+}
+
+/* ==============================
+   LEGACY (hidden, kept for JS compat)
+   ============================== */
 .telescope-area {
     display: none !important;
 }
 
-/* UTILITY */
+/* ==============================
+   UTILITY
+   ============================== */
 .hidden {
     display: none !important;
 }
@@ -1368,5 +1981,26 @@ canvas {
         right: 12px;
         font-size: 0.72rem;
         padding: 5px 14px;
+    }
+
+    .nav-user {
+        padding: 6px 10px;
+    }
+
+    .nav-nickname {
+        font-size: .72rem;
+    }
+
+    .nav-points {
+        font-size: .62rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .notif-panel {
+        right: 8px;
+        left: 8px;
+        width: auto;
+        top: 58px;
     }
 }

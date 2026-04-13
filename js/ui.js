@@ -190,7 +190,6 @@ const UI = (() => {
         Auth.saveState();
     }
 
-    /* addBonus: phân biệt nhiệm vụ / streak / bonus đặc biệt */
     function addBonus(amount, desc) {
         STATE.points = Math.max(0, STATE.points + amount);
         document.getElementById('user-points').textContent = STATE.points;
@@ -233,7 +232,7 @@ const UI = (() => {
         typewriter(el, msg, 60);
     }
 
-    /* ---------- HEALING QUOTES (định kỳ) ---------- */
+    /* ---------- HEALING QUOTES ---------- */
     function startRandomQuotes() {
         setInterval(() => {
             const q = CONFIG.QUOTES[Math.floor(Math.random() * CONFIG.QUOTES.length)];
@@ -321,6 +320,78 @@ const UI = (() => {
         }
     }
 
+    /* ---------- LOGOUT MODAL ---------- */
+    function _showLogoutModal() {
+        const modal = document.getElementById('logout-modal');
+        if (!modal) {
+            // Fallback nếu chưa có HTML modal
+            if (confirm('Rời Trạm? Tiến trình đã được lưu.')) {
+                Auth.logout();
+                location.reload();
+            }
+            return;
+        }
+
+        modal.classList.remove('hidden');
+
+        // Nút Ở lại
+        const cancelBtn = document.getElementById('logout-cancel');
+        const confirmBtn = document.getElementById('logout-confirm');
+
+        // Clone để xóa event cũ
+        const newCancel = cancelBtn.cloneNode(true);
+        const newConfirm = confirmBtn.cloneNode(true);
+        cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+        confirmBtn.parentNode.replaceChild(newConfirm, confirmBtn);
+
+        newCancel.addEventListener('click', () => {
+            modal.classList.add('hidden');
+        });
+
+        newConfirm.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            // Animation rocket bay đi trước khi logout
+            _animateRocketExit(() => {
+                Auth.logout();
+                location.reload();
+            });
+        });
+
+        // Bấm ngoài backdrop để đóng
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+        }, { once: true });
+    }
+
+    function _animateRocketExit(cb) {
+        const rocket = document.createElement('div');
+        rocket.textContent = '🚀';
+        rocket.style.cssText = `
+            position: fixed;
+            bottom: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 2.5rem;
+            z-index: 2000;
+            pointer-events: none;
+            transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.9s ease;
+        `;
+        document.body.appendChild(rocket);
+
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                rocket.style.transform = 'translateX(-50%) translateY(-120vh) rotate(-15deg)';
+                rocket.style.opacity = '0';
+            });
+        });
+
+        setTimeout(() => {
+            rocket.remove();
+            cb && cb();
+        }, 900);
+    }
+
     /* ---------- PANELS ---------- */
     function initPanels() {
         const btnMissions = document.getElementById('btn-missions');
@@ -375,15 +446,10 @@ const UI = (() => {
         }
 
         if (btnLogout) {
-            btnLogout.addEventListener('click', () => {
-                if (confirm('Rời Trạm? Tiến trình đã được lưu.')) {
-                    Auth.logout();
-                    location.reload();
-                }
-            });
+            // ── Thay confirm() bằng modal đẹp ──
+            btnLogout.addEventListener('click', () => _showLogoutModal());
         }
 
-        // Khởi động NotifSystem sau khi DOM sẵn sàng
         NotifSystem.init();
     }
 

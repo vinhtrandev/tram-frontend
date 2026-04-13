@@ -14,358 +14,8 @@
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/animations.css" />
     <link rel="stylesheet" href="css/components.css" />
-
-    <style>
-        /* ── BGM button ── */
-        #bgm-toggle-btn {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 20px;
-            color: rgba(255, 255, 255, 0.5);
-            cursor: pointer;
-            font-size: 0.72rem;
-            padding: 4px 10px;
-            transition: all 0.3s ease;
-            letter-spacing: 0.04em;
-            white-space: nowrap;
-        }
-
-        #bgm-toggle-btn:hover {
-            border-color: rgba(255, 255, 255, 0.4);
-            color: rgba(255, 255, 255, 0.85);
-        }
-
-        #bgm-toggle-btn.active {
-            background: rgba(138, 100, 255, 0.25);
-            border-color: rgba(138, 100, 255, 0.6);
-            color: #c9b8ff;
-            box-shadow: 0 0 8px rgba(138, 100, 255, 0.3);
-        }
-
-        .sound-divider {
-            width: 100%;
-            height: 1px;
-            background: rgba(255, 255, 255, 0.08);
-            margin: 4px 0;
-        }
-
-        .bgm-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-        }
-
-        .bgm-row-label {
-            font-size: 0.68rem;
-            color: rgba(255, 255, 255, 0.4);
-            white-space: nowrap;
-        }
-
-        /* ── Notification Bell Badge ── */
-        .nav-bell-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-
-        .bell-badge {
-            position: absolute;
-            top: -4px;
-            right: -6px;
-            background: #e45c7a;
-            color: #fff;
-            font-size: 0.6rem;
-            font-weight: 700;
-            min-width: 16px;
-            height: 16px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 3px;
-            pointer-events: none;
-            animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .bell-badge.hidden {
-            display: none;
-        }
-
-        @keyframes badge-pop {
-            from {
-                transform: scale(0);
-            }
-
-            to {
-                transform: scale(1);
-            }
-        }
-
-        /* ── Notification Panel ── */
-        .notif-panel {
-            position: fixed;
-            top: 62px;
-            right: 16px;
-            width: 320px;
-            max-height: calc(100vh - 80px);
-            z-index: 300;
-            border-radius: 16px;
-            padding: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.45);
-            animation: panel-drop 0.3s cubic-bezier(0.34, 1.3, 0.64, 1);
-        }
-
-        .notif-panel.hidden {
-            display: none !important;
-        }
-
-        @keyframes panel-drop {
-            from {
-                opacity: 0;
-                transform: translateY(-12px) scale(0.97);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        .notif-panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 16px 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            flex-shrink: 0;
-        }
-
-        .notif-panel-header h3 {
-            margin: 0;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: rgba(255, 255, 255, 0.9);
-            letter-spacing: 0.02em;
-        }
-
-        .notif-summary {
-            display: flex;
-            align-items: center;
-            justify-content: space-around;
-            padding: 12px 10px;
-            background: rgba(255, 255, 255, 0.04);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-            flex-shrink: 0;
-        }
-
-        .notif-summary-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex: 1;
-            justify-content: center;
-        }
-
-        .notif-summary-icon {
-            font-size: 1.2rem;
-            line-height: 1;
-        }
-
-        .notif-summary-item div {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-        }
-
-        .notif-summary-val {
-            font-size: 1.05rem;
-            font-weight: 700;
-            letter-spacing: 0.01em;
-        }
-
-        .notif-summary-item.earned .notif-summary-val {
-            color: #a8f5c4;
-        }
-
-        .notif-summary-item.spent .notif-summary-val {
-            color: #f5c4a8;
-        }
-
-        .notif-summary-item.balance .notif-summary-val {
-            color: #c9b8ff;
-        }
-
-        .notif-summary-lbl {
-            font-size: 0.6rem;
-            color: rgba(255, 255, 255, 0.38);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-
-        .notif-summary-divider {
-            width: 1px;
-            height: 30px;
-            background: rgba(255, 255, 255, 0.1);
-            flex-shrink: 0;
-        }
-
-        .notif-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 8px 0;
-            scrollbar-width: thin;
-            scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
-        }
-
-        .notif-list::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .notif-list::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 4px;
-        }
-
-        .notif-empty {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 36px 20px;
-            gap: 10px;
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 0.8rem;
-            text-align: center;
-            line-height: 1.6;
-        }
-
-        .notif-empty span {
-            font-size: 2rem;
-        }
-
-        .notif-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            transition: background 0.2s;
-            animation: notif-slide 0.25s ease;
-        }
-
-        @keyframes notif-slide {
-            from {
-                opacity: 0;
-                transform: translateX(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        .notif-item:hover {
-            background: rgba(255, 255, 255, 0.04);
-        }
-
-        .notif-item:last-child {
-            border-bottom: none;
-        }
-
-        .notif-item-icon {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            flex-shrink: 0;
-        }
-
-        .notif-item.type-earn .notif-item-icon {
-            background: rgba(168, 245, 196, 0.15);
-        }
-
-        .notif-item.type-spend .notif-item-icon {
-            background: rgba(245, 196, 168, 0.15);
-        }
-
-        .notif-item.type-bonus .notif-item-icon {
-            background: rgba(201, 184, 255, 0.15);
-        }
-
-        .notif-item-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .notif-item-desc {
-            font-size: 0.78rem;
-            color: rgba(255, 255, 255, 0.8);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 2px;
-        }
-
-        .notif-item-time {
-            font-size: 0.62rem;
-            color: rgba(255, 255, 255, 0.3);
-        }
-
-        .notif-item-amount {
-            font-size: 0.88rem;
-            font-weight: 700;
-            flex-shrink: 0;
-            white-space: nowrap;
-        }
-
-        .notif-item.type-earn .notif-item-amount {
-            color: #a8f5c4;
-        }
-
-        .notif-item.type-spend .notif-item-amount {
-            color: #f5c4a8;
-        }
-
-        .notif-item.type-bonus .notif-item-amount {
-            color: #c9b8ff;
-        }
-
-        .notif-clear-btn {
-            width: 100%;
-            background: transparent;
-            border: none;
-            border-top: 1px solid rgba(255, 255, 255, 0.07);
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 0.72rem;
-            padding: 10px;
-            cursor: pointer;
-            transition: color 0.2s, background 0.2s;
-            letter-spacing: 0.04em;
-            flex-shrink: 0;
-        }
-
-        .notif-clear-btn:hover {
-            color: #e45c7a;
-            background: rgba(228, 92, 122, 0.06);
-        }
-
-        @media (max-width: 480px) {
-            .notif-panel {
-                right: 8px;
-                left: 8px;
-                width: auto;
-                top: 58px;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="css/logout-modal.css" />
+    <link rel="stylesheet" href="css/AstronautTimer.css" />
 </head>
 
 <body>
@@ -433,7 +83,6 @@
                     <span class="nav-nickname" id="user-nickname">STAR_99</span>
                     <span class="nav-points"><span id="user-points">0</span> ✨ Tinh Tú</span>
                 </div>
-                <!-- CHUÔNG MỚI: có badge đỏ đếm unread -->
                 <div class="nav-bell-wrapper" id="nav-bell-wrapper">
                     <button class="nav-bell" id="nav-bell-btn" title="Lịch sử Tinh Tú">🔔</button>
                     <span class="bell-badge hidden" id="bell-badge">0</span>
@@ -449,11 +98,7 @@
                 <textarea id="signal-text" placeholder="Hãy viết một tâm tư, một điều ước, hoặc một lời cảm ơn..."
                     maxlength="200"></textarea>
                 <div class="center-input-footer">
-                    <div class="star-type-selector">
-                        <button class="star-type active" data-type="normal" title="Ngôi sao thường">⭐</button>
-                        <button class="star-type" data-type="shooting" title="Sao băng">💫</button>
-                        <button class="star-type" data-type="bright" title="Sao Bắc Đẩu">🌟</button>
-                    </div>
+                    <div class="star-type-selector" id="star-type-selector"></div>
                     <span class="char-count"><span id="char-count">0</span>/200</span>
                     <button class="btn-send" id="btn-send">Gửi Tín Hiệu (+5 ✨)</button>
                 </div>
@@ -464,6 +109,10 @@
         <div class="void-container" id="void-container">
             <div class="void-label">Hố Đen</div>
             <div class="void" id="void">
+                <div class="void-glow-outer"></div>
+                <div class="void-accretion"></div>
+                <div class="void-photon-ring"></div>
+                <div class="void-shadow"></div>
                 <div class="void-spiral"></div>
                 <div class="void-core"></div>
                 <div class="void-timer hidden" id="void-timer">
@@ -554,9 +203,9 @@
 
         <!-- ===== PATIENT ASTRONAUT TIMER ===== -->
         <div class="astronaut-timer glass hidden" id="astronaut-timer">
-            <div class="astro-icon">🧑‍🚀</div>
+            <button class="astro-toggle-btn" id="astro-toggle-btn" title="Thu gọn timer">🧑‍🚀</button>
             <div class="astro-info">
-                <span>Phi hành gia kiên nhẫn</span>
+                <span class="astro-label">Phi hành gia kiên nhẫn</span>
                 <div class="astro-progress-bar">
                     <div id="astro-bar"></div>
                 </div>
@@ -613,6 +262,22 @@
 
     <!-- ===== HEAL PANEL ===== -->
     <div class="side-panel glass hidden" id="heal-panel"></div>
+
+    <!-- ===== LOGOUT CONFIRM MODAL ===== -->
+    <div class="logout-modal-backdrop hidden" id="logout-modal">
+        <div class="logout-modal-box">
+            <div class="logout-modal-icon">🚀</div>
+            <h3 class="logout-modal-title">Rời Trạm?</h3>
+            <p class="logout-modal-desc">
+                Tín hiệu của bạn vẫn lơ lửng giữa vũ trụ,<br />
+                chờ bạn quay về.
+            </p>
+            <div class="logout-modal-btns">
+                <button class="logout-btn-cancel" id="logout-cancel">Ở lại</button>
+                <button class="logout-btn-confirm" id="logout-confirm">Rời Trạm</button>
+            </div>
+        </div>
+    </div>
 
     <!-- SCRIPTS -->
     <script src="js/config.js"></script>

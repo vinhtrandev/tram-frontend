@@ -1,7 +1,7 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - missions.js (FULL v3)
-   + NotifSystem: ghi lịch sử khi hoàn thành nhiệm vụ,
-     điểm danh streak, và void release
+   TRẠM GỬI TÍN HIỆU - missions.js (FULL v5)
+   + _initAstronautTimer: toggle ẩn/hiện đúng
+   + bottom cao hơn để tránh sound panel
    ================================================ */
 
 const Missions = (() => {
@@ -143,7 +143,6 @@ const Missions = (() => {
         setTimeout(() => UI.showHealingQuote(), 1200);
         _updateBar(id, m.max || 1, m.max || 1);
 
-        // Ghi nhận vào lịch sử Tinh Tú
         NotifSystem.add('bonus', `+${m.reward}`, `Hoàn thành: ${m.name}`);
 
         const item = document.getElementById(`mission-${id}`);
@@ -494,7 +493,6 @@ const Missions = (() => {
 
                         setTimeout(() => _showVoidHealToast(), 900);
 
-                        // Dispatch event để app.js hook bắt và ghi NotifSystem
                         document.dispatchEvent(new CustomEvent('void:released'));
 
                         complete('void_hold');
@@ -575,29 +573,52 @@ const Missions = (() => {
         if (skipBtn) { skipBtn.onclick = () => { overlay.classList.add('hidden'); breathingCycle = 0; }; }
     }
 
-    /* ---------- ASTRONAUT TIMER ---------- */
+    /* ================================================
+       ASTRONAUT TIMER — Toggle ẩn/hiện (FIX v5)
+       ================================================ */
+
     function _initAstronautTimer() {
         const timerEl = document.getElementById('astronaut-timer');
-        if (timerEl) timerEl.classList.add('hidden');
+        if (!timerEl) return;
+
+        // Ẩn mặc định khi chưa bắt đầu nhiệm vụ
+        timerEl.classList.add('hidden');
+
+        // Gắn toggle vào nút 🧑‍🚀
+        const toggleBtn = document.getElementById('astro-toggle-btn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isCollapsed = timerEl.classList.toggle('collapsed');
+                toggleBtn.title = isCollapsed ? 'Mở rộng timer' : 'Thu gọn timer';
+            });
+        }
     }
 
     function _startAstronaut() {
         if (_isDone('patient_astronaut')) return;
         if (astroInterval) { clearInterval(astroInterval); astroInterval = null; }
+
         const timerEl = document.getElementById('astronaut-timer');
         const barEl = document.getElementById('astro-bar');
         const timeEl = document.getElementById('astro-time');
         if (!timerEl || !barEl || !timeEl) return;
 
-        timerEl.classList.remove('hidden');
+        // Hiện timer ở trạng thái mở rộng
+        timerEl.classList.remove('hidden', 'collapsed', 'almost-done');
+
         const TOTAL_MS = CONFIG.PATIENT_DURATION;
         const start = Date.now();
 
+        // Nếu user chuyển tab → reset
         function _onTabSwitch() {
             if (document.hidden) {
-                clearInterval(astroInterval); astroInterval = null;
-                barEl.style.width = '0%'; timeEl.textContent = '30:00';
+                clearInterval(astroInterval);
+                astroInterval = null;
                 timerEl.classList.add('hidden');
+                timerEl.classList.remove('collapsed', 'almost-done');
+                barEl.style.width = '0%';
+                timeEl.textContent = '30:00';
                 document.removeEventListener('visibilitychange', _onTabSwitch);
                 UI.showToast('🚀 Phi hành gia rời Trạm... Thử lại từ đầu nhé!');
             }
@@ -610,13 +631,19 @@ const Missions = (() => {
             const rem = Math.max(0, TOTAL_MS - elapsed);
             const mins = Math.floor(rem / 60000);
             const secs = Math.floor((rem % 60000) / 1000);
+
             barEl.style.width = `${pct}%`;
             timeEl.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+            if (rem < 5 * 60 * 1000) timerEl.classList.add('almost-done');
+
             if (elapsed >= TOTAL_MS) {
-                clearInterval(astroInterval); astroInterval = null;
+                clearInterval(astroInterval);
+                astroInterval = null;
                 document.removeEventListener('visibilitychange', _onTabSwitch);
                 complete('patient_astronaut');
                 timerEl.classList.add('hidden');
+                timerEl.classList.remove('almost-done');
             }
         }, 1000);
     }
@@ -640,7 +667,6 @@ const Missions = (() => {
         STATE.points = (parseInt(STATE.points) || 0) + reward;
         Auth.saveState(); UI.updateHUD();
 
-        // Ghi nhận vào lịch sử Tinh Tú
         NotifSystem.add('bonus', `+${reward}`, `Điểm danh ngày ${len} ✅`);
 
         _spawnStreakStars();

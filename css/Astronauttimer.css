@@ -1,0 +1,124 @@
+/* ================================================
+   ASTRONAUT TIMER — Pill góc phải, có toggle
+   ================================================ */
+
+.astronaut-timer {
+    position: fixed;
+    bottom: 320px;
+    right: 28px;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 50px;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s ease,
+        box-shadow 0.3s ease;
+    width: 210px;
+    cursor: default;
+}
+
+/* Thu gọn — chỉ còn icon */
+.astronaut-timer.collapsed {
+    width: 44px;
+}
+
+/* Pulse khi gần xong */
+.astronaut-timer.almost-done {
+    box-shadow: 0 0 0 2px rgba(206, 147, 216, 0.6),
+        0 0 20px rgba(206, 147, 216, 0.3);
+    animation: astroAlmostDone 1.4s ease-in-out infinite;
+}
+
+@keyframes astroAlmostDone {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 2px rgba(206, 147, 216, 0.6), 0 0 20px rgba(206, 147, 216, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 0 3px rgba(244, 143, 177, 0.8), 0 0 32px rgba(244, 143, 177, 0.4);
+    }
+}
+
+/* ── Icon bên trái (luôn hiển thị, là nút toggle) ── */
+.astro-toggle-btn {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    transition: transform 0.2s ease;
+    padding: 0;
+    line-height: 1;
+}
+
+.astro-toggle-btn:hover {
+    transform: scale(1.15);
+}
+
+/* ── Phần info (ẩn khi collapsed) ── */
+.astro-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 14px 10px 2px;
+    overflow: hidden;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.astronaut-timer.collapsed .astro-info {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(6px);
+}
+
+.astro-label {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: 'Quicksand', sans-serif;
+}
+
+.astro-progress-bar {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+#astro-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #CE93D8, #F48FB1);
+    border-radius: 2px;
+    transition: width 1s linear;
+}
+
+#astro-time {
+    font-size: 0.95rem;
+    color: #CE93D8;
+    font-weight: 700;
+    font-family: 'Quicksand', sans-serif;
+    letter-spacing: 0.04em;
+}
+
+/* ── Responsive mobile ── */
+@media (max-width: 700px) {
+    .astronaut-timer {
+        bottom: 290px;
+        right: 14px;
+    }
+}

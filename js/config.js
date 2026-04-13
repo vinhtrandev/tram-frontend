@@ -10,9 +10,33 @@ const CONFIG = {
 
     // Star types
     STAR_TYPES: {
-        normal: { emoji: '⭐', label: 'Ngôi sao', size: [3, 5], color: '#FFFDE7' },
-        shooting: { emoji: '💫', label: 'Sao băng', size: [3, 4], color: '#E1F5FE' },
-        bright: { emoji: '🌟', label: 'Bắc Đẩu', size: [5, 8], color: '#FFFFFF' }
+        shooting: {
+            id: 'shooting',
+            emoji: '💫',
+            label: 'Sao Băng',
+            size: [3, 5],
+            color: '#a8d8ff',
+            ttl: 4 * 60 * 60 * 1000,
+            permanent: false
+        },
+        north: {
+            id: 'north',
+            emoji: '✦',
+            label: 'Sao Bắc Đẩu',
+            size: [5, 8],
+            color: '#fff8c2',
+            ttl: null,
+            permanent: true
+        },
+        cluster: {
+            id: 'cluster',
+            emoji: '⋯',
+            label: 'Chùm Sao',
+            size: [3, 6],
+            color: '#d4b8ff',
+            ttl: 24 * 60 * 60 * 1000,
+            permanent: false
+        }
     },
 
     // Points
@@ -91,7 +115,7 @@ const STATE = {
     dailyMissions: {},
     streak: [],
     starsRead: 0,
-    activeStarType: 'normal',
+    activeStarType: 'shooting',
     currentSound: 'rain',
     patientTimer: null,
     patientStart: null,

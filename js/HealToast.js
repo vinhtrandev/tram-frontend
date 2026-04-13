@@ -27,6 +27,13 @@ const HealToast = (() => {
         'Mọi cảm xúc rồi sẽ qua. Nhưng khoảnh khắc này, bạn không cô đơn.',
         'Bạn làm tốt hơn bạn nghĩ rất nhiều.',
         'Trạm đã nhận được tín hiệu. Cảm ơn bạn đã tin tưởng chia sẻ.',
+        'Nỗi buồn cũng giống như những đám mây, chúng đến rồi sẽ đi, chỉ có bầu trời trong bạn là mãi mãi.',
+        'Gói ghém muộn phiền gửi vào hư vô, ngày mai khi thức dậy, bạn sẽ là một phiên bản nhẹ nhàng hơn.',
+        'Bạn không cần phải mạnh mẽ mọi lúc. Ở đây, bạn được phép yếu đuối và để vũ trụ ôm ấp lấy mình.',
+        'Hãy để bóng tối bao bọc lấy mệt mỏi của bạn, và để ánh sao dẫn lối cho trái tim.',
+        'Hãy cứ tỏa sáng theo cách của riêng bạn, vũ trụ này cần ánh sáng đó.',
+        'Một cái ôm từ xa gửi đến bạn. Mong bạn cảm nhận được hơi ấm giữa không gian vô tận này.',
+        'Tín hiệu của bạn đã được tiếp nhận. Vũ trụ đang gửi lại cho bạn một lời hồi đáp bình yên.',
     ];
 
     let lastIndex = -1;
@@ -40,7 +47,6 @@ const HealToast = (() => {
     }
 
     function show() {
-        // Xóa cái cũ nếu đang hiển thị
         const old = document.getElementById('heal-toast');
         if (old) {
             old.remove();
@@ -51,12 +57,10 @@ const HealToast = (() => {
         el.textContent = _getRandom();
         document.body.appendChild(el);
 
-        // Kích hoạt animation vào
         requestAnimationFrame(() => {
             requestAnimationFrame(() => el.classList.add('visible'));
         });
 
-        // Tự ẩn sau 4.5s
         setTimeout(() => {
             el.classList.remove('visible');
             el.classList.add('hiding');
