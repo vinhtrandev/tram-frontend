@@ -7,9 +7,9 @@
 
 /* ============================================================
    NOTIFICATION / TRANSACTION HISTORY SYSTEM
+   Lưu vào DB qua API + fallback localStorage
    ============================================================ */
 const NotifSystem = (() => {
-    const STORAGE_KEY = 'tinh_tu_history';
     const MAX_ITEMS = 50;
 
     let transactions = [];
@@ -18,18 +18,84 @@ const NotifSystem = (() => {
     let panel, bellBtn, badge, list, emptyEl,
         earnedEl, spentEl, balanceEl, clearBtn, closeBtn;
 
-    function save() {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); } catch (e) { }
+    /* ── Key localStorage riêng theo từng user ── */
+    function _storageKey() {
+        const nick = STATE.user?.nickname || STATE.user?.username || 'guest';
+        return `tinh_tu_history__${nick}`;
     }
 
-    function load() {
+    /* ── Lưu localStorage (fallback offline) ── */
+    function _saveLocal() {
+        try { localStorage.setItem(_storageKey(), JSON.stringify(transactions)); } catch (e) { }
+    }
+
+    /* ── Load: ưu tiên API, fallback localStorage ── */
+    async function _loadFromServer() {
+        const token = STATE.user?.token;
+        if (!token || token === 'local') { _loadLocal(); return; }
+
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const res = await fetch(`${CONFIG.API_BASE}/transactions`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Server error');
+            const data = await res.json();
+
+            // Map server format → internal format
+            transactions = data.map(tx => ({
+                type: tx.type,
+                amount: (tx.amount >= 0 ? '+' : '') + tx.amount,
+                amountNum: tx.amount,
+                desc: tx.desc,
+                time: tx.time
+            }));
+
+            _saveLocal(); // sync về localStorage của đúng user
+        } catch (e) {
+            _loadLocal(); // fallback
+        }
+    }
+
+    function _loadLocal() {
+        try {
+            const raw = localStorage.getItem(_storageKey());
             transactions = raw ? JSON.parse(raw) : [];
         } catch (e) { transactions = []; }
     }
 
-    function formatTime(iso) {
+    /* ── Xoá cache local của user hiện tại (gọi khi logout) ── */
+    function clearLocalCache() {
+        try { localStorage.removeItem(_storageKey()); } catch (e) { }
+        transactions = [];
+        unread = 0;
+        _updateBadge();
+    }
+
+    /* ── Ghi lên server (best-effort, không block UI) ── */
+    async function _saveToServer(type, amountNum, desc) {
+        const token = STATE.user?.token;
+        if (!token || token === 'local') return;
+
+        try {
+            await fetch(`${CONFIG.API_BASE}/transactions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    type,
+                    amount: String(amountNum),
+                    desc
+                })
+            });
+        } catch (e) {
+            // silent fail — localStorage đã có rồi
+        }
+    }
+
+    /* ── Helpers ── */
+    function _formatTime(iso) {
         const d = new Date(iso);
         const diffMin = Math.floor((Date.now() - d) / 60000);
         if (diffMin < 1) return 'Vừa xong';
@@ -41,11 +107,12 @@ const NotifSystem = (() => {
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
     }
 
-    function typeIcon(type) {
+    function _typeIcon(type) {
         return { earn: '✨', spend: '🎁', bonus: '⭐' }[type] || '💫';
     }
 
-    function renderSummary() {
+    /* ── Render summary ── */
+    function _renderSummary() {
         const earned = transactions
             .filter(t => t.type === 'earn' || t.type === 'bonus')
             .reduce((s, t) => s + Math.abs(t.amountNum), 0);
@@ -60,7 +127,8 @@ const NotifSystem = (() => {
         if (balanceEl) balanceEl.textContent = balance;
     }
 
-    function renderList() {
+    /* ── Render danh sách giao dịch ── */
+    function _renderList() {
         if (!list) return;
         [...list.querySelectorAll('.notif-item')].forEach(el => el.remove());
 
@@ -74,10 +142,10 @@ const NotifSystem = (() => {
             const item = document.createElement('div');
             item.className = `notif-item type-${tx.type}`;
             item.innerHTML = `
-                <div class="notif-item-icon">${typeIcon(tx.type)}</div>
+                <div class="notif-item-icon">${_typeIcon(tx.type)}</div>
                 <div class="notif-item-body">
                     <div class="notif-item-desc" title="${tx.desc}">${tx.desc}</div>
-                    <div class="notif-item-time">${formatTime(tx.time)}</div>
+                    <div class="notif-item-time">${_formatTime(tx.time)}</div>
                 </div>
                 <div class="notif-item-amount">${tx.amount} ✨</div>
             `;
@@ -85,7 +153,53 @@ const NotifSystem = (() => {
         });
     }
 
-    function updateBadge() {
+    /* ── Trạng thái loading cho panel ── */
+    function _showLoading() {
+        if (!list) return;
+        [...list.querySelectorAll('.notif-item')].forEach(el => el.remove());
+        if (emptyEl) emptyEl.classList.add('hidden');
+
+        const loader = document.createElement('div');
+        loader.id = 'notif-loader';
+        loader.style.cssText = `
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 0;
+            gap: 10px;
+            color: rgba(212,184,255,0.5);
+            font-family: 'Quicksand', sans-serif;
+            font-size: 0.82rem;
+        `;
+        loader.innerHTML = `
+            <div style="
+                width: 28px; height: 28px;
+                border: 2px solid rgba(156,125,255,0.15);
+                border-top-color: rgba(156,125,255,0.7);
+                border-radius: 50%;
+                animation: notifSpin 0.8s linear infinite;
+            "></div>
+            <span>Đang tải lịch sử...</span>
+        `;
+
+        // Inject keyframe nếu chưa có
+        if (!document.getElementById('notif-spin-style')) {
+            const s = document.createElement('style');
+            s.id = 'notif-spin-style';
+            s.textContent = `@keyframes notifSpin { to { transform: rotate(360deg); } }`;
+            document.head.appendChild(s);
+        }
+
+        list.appendChild(loader);
+    }
+
+    function _hideLoading() {
+        document.getElementById('notif-loader')?.remove();
+    }
+
+    /* ── Update badge ── */
+    function _updateBadge() {
         if (!badge) return;
         if (unread > 0) {
             badge.textContent = unread > 99 ? '99+' : unread;
@@ -95,37 +209,60 @@ const NotifSystem = (() => {
         }
     }
 
-    function toggle() {
+    /* ── Toggle panel (load từ server mỗi lần mở) ── */
+    async function toggle() {
         if (!panel) return;
         const isHidden = panel.classList.contains('hidden');
         if (isHidden) {
+            // Đóng các panel khác
             document.getElementById('missions-panel')?.classList.add('hidden');
             document.getElementById('store-panel')?.classList.add('hidden');
             document.getElementById('heal-panel')?.classList.add('hidden');
+
             panel.classList.remove('hidden');
             unread = 0;
-            updateBadge();
-            renderSummary();
-            renderList();
+            _updateBadge();
+
+            // Hiển thị loading → load server → render
+            _showLoading();
+            await _loadFromServer();
+            _hideLoading();
+            _renderSummary();
+            _renderList();
         } else {
             panel.classList.add('hidden');
         }
     }
 
+    /* ── PUBLIC: add transaction ── */
     function add(type, amount, desc) {
         const amountNum = parseInt(String(amount).replace(/[^0-9-]/g, '')) || 0;
-        const tx = { type, amount: String(amount), amountNum, desc, time: new Date().toISOString() };
+        const tx = {
+            type,
+            amount: String(amount),
+            amountNum,
+            desc,
+            time: new Date().toISOString()
+        };
+
         transactions.push(tx);
-        if (transactions.length > MAX_ITEMS) transactions.splice(0, transactions.length - MAX_ITEMS);
-        save();
+        if (transactions.length > MAX_ITEMS)
+            transactions.splice(0, transactions.length - MAX_ITEMS);
+
+        _saveLocal();                            // lưu local ngay lập tức
+        _saveToServer(type, amountNum, desc);    // gửi server async (không block)
+
         unread++;
-        updateBadge();
+        _updateBadge();
+
+        // Nếu panel đang mở → cập nhật luôn
         if (panel && !panel.classList.contains('hidden')) {
-            renderSummary();
-            renderList();
+            _renderSummary();
+            _renderList();
         }
     }
 
+    /* ── Init ── */
     function init() {
         panel = document.getElementById('notif-panel');
         bellBtn = document.getElementById('nav-bell-btn');
@@ -138,16 +275,23 @@ const NotifSystem = (() => {
         clearBtn = document.getElementById('notif-clear-btn');
         closeBtn = document.getElementById('close-notif');
 
-        load();
+        // Reset sạch trước — không dùng data của user khác còn sót
+        transactions = [];
+        unread = 0;
+
+        // Load local của đúng user hiện tại (key theo nickname)
+        _loadLocal();
+        _updateBadge();
 
         bellBtn?.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
         closeBtn?.addEventListener('click', () => panel?.classList.add('hidden'));
+
         clearBtn?.addEventListener('click', () => {
             if (confirm('Xoá toàn bộ lịch sử giao dịch?')) {
                 transactions = [];
-                save();
-                renderSummary();
-                renderList();
+                _saveLocal();
+                _renderSummary();
+                _renderList();
             }
         });
 
@@ -158,7 +302,7 @@ const NotifSystem = (() => {
         });
     }
 
-    return { init, add };
+    return { init, add, clearLocalCache };
 })();
 
 
@@ -202,20 +346,15 @@ const VoidTimer = (() => {
         const elapsed = Date.now() - startTime;
         const fraction = Math.min(elapsed / HOLD_DURATION, 1);
 
-        // Vòng tròn chạy từ rỗng → đầy (390 → 0)
         progressEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - fraction);
 
-        // Đếm ngược 10 → 0
         const remaining = Math.ceil((HOLD_DURATION - elapsed) / 1000);
         countEl.textContent = Math.max(remaining, 0);
 
-        if (isHolding) {
-            rafId = requestAnimationFrame(_tick);
-        }
+        if (isHolding) rafId = requestAnimationFrame(_tick);
     }
 
     function _startHold(e) {
-        // Ngăn scroll khi touch
         if (e && e.type === 'touchstart') e.preventDefault();
         if (isHolding) return;
         isHolding = true;
@@ -223,32 +362,26 @@ const VoidTimer = (() => {
 
         _showTimer();
         rafId = requestAnimationFrame(_tick);
-
         holdTimer = setTimeout(_finishHold, HOLD_DURATION);
     }
 
     function _finishHold() {
         _stopHold();
 
-        // Đảm bảo vòng đầy + số = 0
         progressEl.style.strokeDashoffset = 0;
         countEl.textContent = '0';
 
-        // Flash
         if (voidEl) {
             voidEl.style.animation = 'voidFlash 0.6s ease';
             setTimeout(() => { voidEl.style.animation = ''; }, 700);
         }
 
-        // Dispatch event để app.js ghi điểm
         document.dispatchEvent(new CustomEvent('void:released'));
 
-        // Toast buông bỏ
         if (typeof UI !== 'undefined') {
             UI.showToast('🌑 Bạn đã buông bỏ thành công. Hãy thở sâu~', 4000);
         }
 
-        // Ẩn timer sau 0.9s
         setTimeout(_hideTimer, 900);
     }
 
@@ -268,20 +401,17 @@ const VoidTimer = (() => {
         _getEls();
         if (!voidEl) return;
 
-        // Xoá mọi listener cũ bằng cách clone
         const newVoid = voidEl.cloneNode(true);
         voidEl.parentNode.replaceChild(newVoid, voidEl);
         voidEl = newVoid;
-        // Lấy lại reference timer sau khi clone (timer nằm bên trong void)
+
         timerWrap = document.getElementById('void-timer');
         progressEl = document.getElementById('timer-progress');
         countEl = document.getElementById('void-count');
 
-        // Mouse
         voidEl.addEventListener('mousedown', _startHold);
         window.addEventListener('mouseup', _cancelHold);
 
-        // Touch — preventDefault để không scroll
         voidEl.addEventListener('touchstart', _startHold, { passive: false });
         window.addEventListener('touchend', _cancelHold, { passive: true });
         window.addEventListener('touchcancel', _cancelHold, { passive: true });
@@ -397,6 +527,13 @@ const UI = (() => {
     /* ---------- HEAL PANEL ---------- */
     let _healIndex = Math.floor(Math.random() * (CONFIG?.QUOTES?.length || 1));
 
+    function _nextHealQuote() {
+        let next;
+        do { next = Math.floor(Math.random() * CONFIG.QUOTES.length); }
+        while (next === _healIndex && CONFIG.QUOTES.length > 1);
+        _healIndex = next;
+    }
+
     function _renderHealPanel() {
         const panel = document.getElementById('heal-panel');
         if (!panel) return;
@@ -407,16 +544,52 @@ const UI = (() => {
                 <button class="panel-close" id="close-heal">✕</button>
             </div>
             <div class="heal-body">
-                <div class="heal-quote-card">
+                <div class="heal-quote-card" id="heal-quote-card" title="Chạm để đổi câu">
                     <span class="heal-quote-icon">🌸</span>
                     <p class="heal-quote-text" id="heal-quote-text"></p>
+                    <span class="heal-tap-hint">Chạm để đổi câu ✨</span>
                 </div>
-                <button class="btn-new-quote" id="btn-new-quote">
-                    <span class="btn-new-quote-icon">✨</span>
-                    <span>Câu khác</span>
-                </button>
             </div>
         `;
+
+        if (!document.getElementById('heal-card-style')) {
+            const s = document.createElement('style');
+            s.id = 'heal-card-style';
+            s.textContent = `
+                #heal-quote-card {
+                    cursor: pointer;
+                    user-select: none;
+                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                    position: relative;
+                    overflow: hidden;
+                }
+                #heal-quote-card:hover {
+                    transform: scale(1.02);
+                    box-shadow: 0 0 20px rgba(156,125,255,0.2);
+                }
+                #heal-quote-card:active { transform: scale(0.97); }
+                .heal-tap-hint {
+                    display: block;
+                    text-align: center;
+                    font-size: 0.65rem;
+                    color: rgba(156,125,255,0.45);
+                    font-family: 'Quicksand', sans-serif;
+                    margin-top: 10px;
+                    letter-spacing: 0.04em;
+                    pointer-events: none;
+                }
+                .heal-ripple {
+                    position: absolute;
+                    border-radius: 50%;
+                    background: rgba(156,125,255,0.18);
+                    transform: scale(0);
+                    animation: healRippleAnim 0.5s ease-out forwards;
+                    pointer-events: none;
+                }
+                @keyframes healRippleAnim { to { transform: scale(4); opacity: 0; } }
+            `;
+            document.head.appendChild(s);
+        }
 
         _showHealQuote(false);
 
@@ -424,11 +597,21 @@ const UI = (() => {
             panel.classList.add('hidden');
         });
 
-        document.getElementById('btn-new-quote')?.addEventListener('click', () => {
-            let next;
-            do { next = Math.floor(Math.random() * CONFIG.QUOTES.length); }
-            while (next === _healIndex && CONFIG.QUOTES.length > 1);
-            _healIndex = next;
+        document.getElementById('heal-quote-card')?.addEventListener('click', (e) => {
+            const card = e.currentTarget;
+            const rect = card.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const ripple = document.createElement('span');
+            ripple.className = 'heal-ripple';
+            ripple.style.cssText = `
+                width:${size}px; height:${size}px;
+                left:${e.clientX - rect.left - size / 2}px;
+                top:${e.clientY - rect.top - size / 2}px;
+            `;
+            card.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 500);
+
+            _nextHealQuote();
             _showHealQuote(true);
         });
     }
@@ -477,6 +660,7 @@ const UI = (() => {
 
         newConfirm.addEventListener('click', () => {
             modal.classList.add('hidden');
+            NotifSystem.clearLocalCache(); // xoá cache lịch sử của user hiện tại
             _animateRocketExit(() => {
                 Auth.logout();
                 location.reload();
@@ -577,7 +761,6 @@ const UI = (() => {
         NotifSystem.init();
 
         // ── Khởi tạo Void Hold Timer ──
-        // Dùng setTimeout để đảm bảo DOM #void đã render xong
         setTimeout(() => VoidTimer.init(), 200);
     }
 

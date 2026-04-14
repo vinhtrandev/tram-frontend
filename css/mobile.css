@@ -1,0 +1,490 @@
+/* ================================================
+   MOBILE.CSS — v10
+   ================================================ */
+
+.bottom-nav {
+    display: none;
+}
+
+@media (max-width: 700px) {
+
+    /* ── NAV-LINKS desktop ẩn ── */
+    .nav-links {
+        display: none !important;
+    }
+
+    /* ── NAVBAR ── */
+    .top-navbar {
+        padding: 0 10px;
+        gap: 6px;
+    }
+
+    .nav-logo-text {
+        font-size: 0.6rem;
+        letter-spacing: .07em;
+    }
+
+    .nav-logo-icon {
+        font-size: 1.1rem;
+    }
+
+    .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: auto;
+    }
+
+    .nav-user {
+        padding: 4px 8px 4px 5px;
+        gap: 5px;
+    }
+
+    .nav-user-avatar {
+        width: 22px;
+        height: 22px;
+        font-size: 0.52rem;
+    }
+
+    .nav-nickname {
+        font-size: 0.66rem;
+    }
+
+    .nav-points {
+        font-size: 0.56rem;
+    }
+
+    .nav-user-divider {
+        height: 12px;
+    }
+
+    .nav-bell {
+        width: 26px;
+        height: 26px;
+        font-size: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    .nav-logout {
+        width: 26px;
+        height: 26px;
+        font-size: 12px;
+        flex-shrink: 0;
+        padding: 0;
+        margin-left: 2px;
+    }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 300;
+        height: 70px;
+        background: rgba(8, 11, 18, 0.95);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        align-items: center;
+        justify-content: space-around;
+        padding: 0 4px 8px;
+    }
+
+    /* ── HỐ ĐEN ── */
+    .void-container {
+        left: 10px;
+        bottom: 88px;
+        z-index: 10;
+        transform: scale(0.52);
+        transform-origin: bottom left;
+    }
+
+    /* ── SIDE PANEL ── */
+    .side-panel {
+        position: fixed;
+        top: var(--navbar-h);
+        left: 0;
+        right: 0;
+        width: 100vw;
+        max-height: calc(100vh - var(--navbar-h) - 70px);
+        bottom: 70px;
+        border-radius: 0;
+        z-index: 200;
+        overflow-y: auto;
+        padding: 16px;
+    }
+
+    /* ── BTN TOGGLE INPUT ── */
+    .btn-toggle-input {
+        bottom: 88px;
+        left: 50%;
+        right: unset;
+        transform: translateX(-50%);
+        font-size: 0.82rem;
+        padding: 10px 22px;
+        z-index: 150;
+    }
+
+    /* ── CENTER INPUT AREA ── */
+    .center-input-area {
+        width: 92vw;
+        max-width: 92vw;
+        left: 50%;
+        right: unset;
+        transform: translate(-50%, -50%);
+        z-index: 150;
+        box-sizing: border-box;
+    }
+
+    .center-input-box {
+        width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    /* Footer 2 hàng */
+    .center-input-footer {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .input-footer-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .star-type-selector {
+        display: flex;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .star-type-btn,
+    .star-type-selector>* {
+        flex: 1 !important;
+        min-width: 0 !important;
+        width: auto !important;
+        height: 44px !important;
+        font-size: 0.55rem !important;
+        box-sizing: border-box !important;
+    }
+
+    .char-count {
+        font-size: 0.65rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .center-input-footer>.btn-send,
+    .center-input-footer>button:not(.star-type-btn) {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+        font-size: 0.82rem;
+        padding: 10px 14px;
+        box-sizing: border-box;
+    }
+
+    .input-footer-right {
+        display: flex;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .input-footer-right>button,
+    .input-footer-right>.btn-send {
+        flex: 1;
+        text-align: center;
+        justify-content: center;
+        font-size: 0.82rem;
+        padding: 10px 8px;
+        box-sizing: border-box;
+    }
+
+    /* ── ASTRONAUT TIMER ── */
+    .astronaut-timer {
+        bottom: 280px;
+        right: 12px;
+        z-index: 150;
+    }
+
+    /* ── SOUND PANEL ── */
+    .sound-panel {
+        position: fixed;
+        right: 10px;
+        bottom: 136px;
+        /* 88px bottom-nav + 38px nút + 10px gap */
+        z-index: 250;
+    }
+
+    .sound-panel.sp-open {
+        display: flex !important;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+        width: 170px;
+        height: auto;
+        padding: 10px 12px 10px;
+        border-radius: 14px;
+        background: rgba(8, 11, 18, 0.95) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+    }
+
+    .sound-close-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.45);
+        font-size: 0.8rem;
+        cursor: pointer;
+        padding: 2px 4px;
+        line-height: 1;
+    }
+
+    .sound-panel.sp-open .sound-label {
+        display: block;
+        font-size: 0.68rem;
+        font-weight: 600;
+        margin-bottom: 2px;
+    }
+
+    .sound-panel.sp-open .bgm-row {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.65rem;
+    }
+
+    .sound-panel.sp-open .sound-divider {
+        display: block;
+        width: 100%;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.08);
+        margin: 2px 0;
+    }
+
+    .sound-panel.sp-open .sound-btns {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        width: 100%;
+    }
+
+    .sound-btn {
+        font-size: 0.7rem;
+        padding: 6px 8px;
+        width: 100%;
+        text-align: left;
+        border-radius: 8px;
+    }
+
+    #bgm-toggle-btn {
+        font-size: 0.62rem;
+        padding: 3px 7px;
+        flex-shrink: 0;
+    }
+
+    /* ── NÚT FLOATING 🎵 ── */
+    .sound-float-btn {
+        position: fixed;
+        right: 10px;
+        bottom: 88px;
+        z-index: 250;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(20, 14, 40, 0.75);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        cursor: pointer;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── TOASTS ── */
+    #heal-toast {
+        bottom: 84px;
+    }
+
+    #void-effect-badge {
+        top: calc(var(--navbar-h) + 8px);
+        right: 10px;
+    }
+
+    .toast-container {
+        top: calc(var(--navbar-h) + 8px);
+    }
+}
+
+/* ================================================================
+   BOTTOM NAV STYLES
+   ================================================================ */
+.bn-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1;
+    cursor: pointer;
+    padding: 6px 4px;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    transition: background 0.2s ease;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bn-item:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.bn-item.active {
+    background: rgba(206, 147, 216, 0.10);
+}
+
+.bn-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bn-label {
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.38);
+    font-weight: 500;
+    white-space: nowrap;
+    font-family: var(--font-body);
+}
+
+.bn-item.active .bn-label {
+    color: var(--accent-purple);
+}
+
+.bn-item.active .bn-icon::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent-purple);
+}
+
+.bn-badge {
+    position: absolute;
+    top: -4px;
+    right: -6px;
+    background: #e45c7a;
+    color: #fff;
+    font-size: 0.45rem;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    pointer-events: none;
+}
+
+.bn-badge.hidden {
+    display: none;
+}
+
+.bn-send {
+    flex: 0 0 62px;
+    width: 62px;
+    height: 62px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(80, 40, 160, 0.9), rgba(160, 80, 220, 0.85));
+    border: 1.5px solid rgba(200, 150, 255, 0.45);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-top: -18px;
+    box-shadow: 0 0 24px rgba(150, 80, 255, 0.35), 0 4px 16px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative;
+    gap: 2px;
+    -webkit-tap-highlight-color: transparent;
+    font-family: var(--font-body);
+}
+
+.bn-send:hover {
+    transform: scale(1.06);
+    box-shadow: 0 0 36px rgba(180, 100, 255, 0.5);
+}
+
+.bn-send:active {
+    transform: scale(0.94);
+}
+
+.bn-send-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 5px rgba(200, 160, 255, 0.7));
+}
+
+.bn-send-label {
+    font-size: 0.5rem;
+    color: rgba(235, 215, 255, 0.85);
+    letter-spacing: 0.07em;
+    font-weight: 600;
+}
+
+.bn-send::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 1px solid rgba(200, 140, 255, 0.25);
+    animation: bnSendRing 2.5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes bnSendRing {
+
+    0%,
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.85;
+        transform: scale(1.08);
+    }
+}

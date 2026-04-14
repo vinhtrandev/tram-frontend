@@ -1,6 +1,13 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - canvas.js
+   TRẠM GỬI TÍN HIỆU - canvas.js  [OPTIMISED]
    Three-layer parallax star background + nebula
+
+   Fixes:
+   - shadowBlur chỉ dùng cho layer gần (layer 2), tắt cho layer 0+1
+   - Landing RAF tự huỷ khi chuyển sang main screen
+   - mousemove throttle 60fps (requestAnimationFrame)
+   - Resize debounce 200ms
+   - Main RAF ID được expose để destroy đúng cách
    ================================================ */
 
 const Canvas = (() => {
@@ -9,16 +16,29 @@ const Canvas = (() => {
     let landingCanvas, mainCanvas;
     let W, H;
     let mouse = { x: 0, y: 0 };
-    let raf;
+    let _targetMouse = { x: 0, y: 0 };
+    let _rafMain = null;
+    let _rafLanding = null;
+    let _resizeTimer = null;
+    let _mousePending = false;
 
     /* ---------- Star layers ---------- */
     const layers = [
-        // Layer 0: far (tiny, slow)
-        { stars: [], count: 160, sizeMin: 0.8, sizeMax: 2.2, speed: 0.3, baseOpacity: [0.25, 0.6] },
-        // Layer 1: mid
-        { stars: [], count: 80, sizeMin: 2.2, sizeMax: 4.5, speed: 0.6, baseOpacity: [0.45, 0.85] },
-        // Layer 2: near (large, blurry, fast parallax)
-        { stars: [], count: 30, sizeMin: 4.5, sizeMax: 8.0, speed: 1.2, baseOpacity: [0.2, 0.5] }
+        // Layer 0: xa — nhỏ, chậm, KHÔNG shadow
+        {
+            stars: [], count: 120, sizeMin: 0.6, sizeMax: 1.8,
+            speed: 0.3, baseOpacity: [0.2, 0.55], useShadow: false
+        },
+        // Layer 1: giữa — KHÔNG shadow
+        {
+            stars: [], count: 60, sizeMin: 1.8, sizeMax: 3.5,
+            speed: 0.6, baseOpacity: [0.4, 0.8], useShadow: false
+        },
+        // Layer 2: gần — lớn, CÓ shadow (ít thôi)
+        {
+            stars: [], count: 22, sizeMin: 3.5, sizeMax: 7.0,
+            speed: 1.2, baseOpacity: [0.18, 0.45], useShadow: true
+        }
     ];
 
     const COLORS = ['#FFFDE7', '#E1F5FE', '#F8F8FF', '#CE93D8', '#F48FB1'];
@@ -31,10 +51,9 @@ const Canvas = (() => {
             layer.stars = Array.from({ length: layer.count }, () => ({
                 x: Math.random() * w,
                 y: Math.random() * h,
-                ox: 0, oy: 0,
                 size: _rand(layer.sizeMin, layer.sizeMax),
                 opacity: _rand(layer.baseOpacity[0], layer.baseOpacity[1]),
-                twinkleSpeed: _rand(0.002, 0.008),
+                twinkleSpeed: _rand(0.001, 0.006),
                 twinklePhase: Math.random() * Math.PI * 2,
                 color: COLORS[Math.floor(Math.random() * COLORS.length)]
             }));
@@ -44,89 +63,103 @@ const Canvas = (() => {
     /* ---------- Draw one layer ---------- */
     function _drawLayer(ctx, layer, t, parallaxFactor) {
         const cx = W / 2, cy = H / 2;
-        const dx = (mouse.x - cx) * parallaxFactor * 0.04;
-        const dy = (mouse.y - cy) * parallaxFactor * 0.04;
+        // Parallax mượt: lerp mouse
+        const dx = (mouse.x - cx) * parallaxFactor * 0.035;
+        const dy = (mouse.y - cy) * parallaxFactor * 0.035;
 
         layer.stars.forEach(s => {
             const tw = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 1000 + s.twinklePhase);
-            const op = s.opacity * (0.6 + 0.4 * tw);
+            const op = Math.min(s.opacity * (0.65 + 0.35 * tw), 1);
 
-            ctx.save();
-            ctx.globalAlpha = Math.min(op, 1);
+            ctx.globalAlpha = op;
             ctx.fillStyle = s.color;
-            ctx.shadowColor = s.color;
-            ctx.shadowBlur = s.size * 3 * tw;
+
+            // shadowBlur chỉ cho layer gần và chỉ khi twinkle cao
+            if (layer.useShadow && tw > 0.6) {
+                ctx.shadowColor = s.color;
+                ctx.shadowBlur = s.size * 2.5 * tw;
+            }
 
             ctx.beginPath();
-            ctx.arc(s.x + dx, s.y + dy, s.size * (0.9 + 0.1 * tw), 0, Math.PI * 2);
+            ctx.arc(s.x + dx, s.y + dy, s.size * (0.92 + 0.08 * tw), 0, Math.PI * 2);
             ctx.fill();
-            ctx.restore();
+
+            // Reset shadow sau mỗi sao (tránh leak)
+            if (layer.useShadow) ctx.shadowBlur = 0;
         });
+
+        ctx.globalAlpha = 1;
     }
 
-    /* ---------- Nebula ---------- */
+    /* ---------- Nebula (đơn giản hơn, bỏ scale trick) ---------- */
     function _drawNebula(ctx, t) {
         const nebulas = [
-            { x: W * 0.6, y: H * 0.2, rx: 300, ry: 200, color: 'rgba(26,27,46,', drift: 0.3 },
-            { x: W * 0.2, y: H * 0.7, rx: 200, ry: 280, color: 'rgba(20,10,40,', drift: -0.2 },
-            { x: W * 0.8, y: H * 0.6, rx: 180, ry: 150, color: 'rgba(30,15,50,', drift: 0.15 }
+            { x: W * 0.62, y: H * 0.22, r: 260, color: [26, 27, 46], drift: 0.3 },
+            { x: W * 0.18, y: H * 0.72, r: 220, color: [20, 10, 40], drift: -0.2 },
+            { x: W * 0.82, y: H * 0.58, r: 180, color: [30, 15, 50], drift: 0.15 }
         ];
         nebulas.forEach(n => {
-            const off = Math.sin(t * 0.0002 + n.drift) * 20;
-            const grad = ctx.createRadialGradient(n.x + off, n.y + off, 0, n.x + off, n.y + off, Math.max(n.rx, n.ry));
-            grad.addColorStop(0, n.color + '0.5)');
-            grad.addColorStop(1, n.color + '0)');
-            ctx.save();
-            ctx.scale(n.rx / Math.max(n.rx, n.ry), n.ry / Math.max(n.rx, n.ry));
-            ctx.fillStyle = grad;
+            const off = Math.sin(t * 0.00018 + n.drift) * 18;
+            const gx = n.x + off, gy = n.y + off;
+            const gr = ctx.createRadialGradient(gx, gy, 0, gx, gy, n.r);
+            gr.addColorStop(0, `rgba(${n.color},0.45)`);
+            gr.addColorStop(1, `rgba(${n.color},0)`);
+            ctx.fillStyle = gr;
             ctx.beginPath();
-            ctx.arc((n.x + off) / (n.rx / Math.max(n.rx, n.ry)), (n.y + off) / (n.ry / Math.max(n.rx, n.ry)), Math.max(n.rx, n.ry), 0, Math.PI * 2);
+            ctx.arc(gx, gy, n.r, 0, Math.PI * 2);
             ctx.fill();
-            ctx.restore();
         });
     }
 
     /* ---------- Landing canvas ---------- */
     function initLanding() {
         landingCanvas = document.getElementById('landing-stars');
+        if (!landingCanvas) return;
         landingCtx = landingCanvas.getContext('2d');
         _resize(landingCanvas);
 
-        const stars = Array.from({ length: 200 }, () => ({
+        // 150 sao tĩnh (không shadow) — landing nhẹ
+        const stars = Array.from({ length: 150 }, () => ({
             x: Math.random(), y: Math.random(),
-            size: _rand(1.2, 4.5),
-            opacity: _rand(0.25, 0.85),
-            twinkleSpeed: _rand(0.001, 0.006),
+            size: _rand(0.8, 3.5),
+            opacity: _rand(0.2, 0.75),
+            twinkleSpeed: _rand(0.0008, 0.004),
             twinklePhase: Math.random() * Math.PI * 2,
             color: COLORS[Math.floor(Math.random() * COLORS.length)]
         }));
 
         function draw(t) {
+            // Huỷ nếu landing canvas đã bị remove khỏi DOM
+            if (!landingCanvas.isConnected) { _rafLanding = null; return; }
+
             const { width: w, height: h } = landingCanvas;
             landingCtx.clearRect(0, 0, w, h);
 
             stars.forEach(s => {
                 const tw = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 1000 + s.twinklePhase);
-                const op = s.opacity * (0.6 + 0.4 * tw);
-                landingCtx.save();
-                landingCtx.globalAlpha = op;
+                landingCtx.globalAlpha = Math.min(s.opacity * (0.65 + 0.35 * tw), 1);
                 landingCtx.fillStyle = s.color;
-                landingCtx.shadowColor = s.color;
-                landingCtx.shadowBlur = s.size * 4 * tw;
+                // Không dùng shadowBlur trên landing
                 landingCtx.beginPath();
-                landingCtx.arc(s.x * w, s.y * h, s.size, 0, Math.PI * 2);
+                landingCtx.arc(s.x * w, s.y * h, s.size * (0.92 + 0.08 * tw), 0, Math.PI * 2);
                 landingCtx.fill();
-                landingCtx.restore();
             });
+            landingCtx.globalAlpha = 1;
 
-            requestAnimationFrame(draw);
+            _rafLanding = requestAnimationFrame(draw);
         }
-        requestAnimationFrame(draw);
+        _rafLanding = requestAnimationFrame(draw);
+    }
+
+    /* ---------- Stop landing (gọi khi chuyển màn) ---------- */
+    function stopLanding() {
+        if (_rafLanding) { cancelAnimationFrame(_rafLanding); _rafLanding = null; }
     }
 
     /* ---------- Main canvas ---------- */
     function initMain() {
         mainCanvas = document.getElementById('star-canvas');
+        if (!mainCanvas) return;
         mainCtx = mainCanvas.getContext('2d');
         _resize(mainCanvas);
         W = mainCanvas.width;
@@ -134,22 +167,32 @@ const Canvas = (() => {
 
         _initLayers(W, H);
 
+        // Throttle mousemove qua RAF — không xử lý từng pixel
         window.addEventListener('mousemove', e => {
-            mouse.x = e.clientX;
-            mouse.y = e.clientY;
-        });
+            _targetMouse.x = e.clientX;
+            _targetMouse.y = e.clientY;
+            if (!_mousePending) {
+                _mousePending = true;
+                requestAnimationFrame(() => {
+                    mouse.x = _targetMouse.x;
+                    mouse.y = _targetMouse.y;
+                    _mousePending = false;
+                });
+            }
+        }, { passive: true });
 
         function draw(t) {
             mainCtx.clearRect(0, 0, W, H);
             _drawNebula(mainCtx, t);
-            _drawLayer(mainCtx, layers[0], t, 0.2);
-            _drawLayer(mainCtx, layers[1], t, 0.5);
-            _drawLayer(mainCtx, layers[2], t, 1.0);
-            raf = requestAnimationFrame(draw);
+            _drawLayer(mainCtx, layers[0], t, 0.15);
+            _drawLayer(mainCtx, layers[1], t, 0.45);
+            _drawLayer(mainCtx, layers[2], t, 0.9);
+            _rafMain = requestAnimationFrame(draw);
         }
-        raf = requestAnimationFrame(draw);
+        _rafMain = requestAnimationFrame(draw);
     }
 
+    /* ---------- Resize (debounce 200ms) ---------- */
     function _resize(canvas) {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -157,13 +200,23 @@ const Canvas = (() => {
         H = canvas.height;
     }
 
+    window.addEventListener('resize', () => {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(() => {
+            if (mainCanvas) {
+                _resize(mainCanvas);
+                _initLayers(mainCanvas.width, mainCanvas.height);
+            }
+            if (landingCanvas && landingCanvas.isConnected) {
+                _resize(landingCanvas);
+            }
+        }, 200);
+    }, { passive: true });
+
     function destroy() {
-        if (raf) cancelAnimationFrame(raf);
+        if (_rafMain) { cancelAnimationFrame(_rafMain); _rafMain = null; }
+        if (_rafLanding) { cancelAnimationFrame(_rafLanding); _rafLanding = null; }
     }
 
-    window.addEventListener('resize', () => {
-        if (mainCanvas) { _resize(mainCanvas); _initLayers(mainCanvas.width, mainCanvas.height); }
-    });
-
-    return { initLanding, initMain, destroy };
+    return { initLanding, initMain, stopLanding, destroy };
 })();

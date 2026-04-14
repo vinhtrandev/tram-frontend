@@ -1,11 +1,24 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - app.js
+   TRẠM GỬI TÍN HIỆU - app.js  [OPTIMISED]
    Main orchestrator: boot sequence, screen flow
    + NotifSystem hooks cho tất cả sự kiện điểm
    + Star type preview popup + bounce animation
+
+   Fixes:
+   - _animateNorthIcon chỉ chạy khi nút visible
+     (dùng IntersectionObserver + pause/resume)
+   - _animateNorthIconLarge chỉ chạy khi preview .show
+   - Canvas.stopLanding() khi transition sang main
+   - Dọn RAF khi không cần
    ================================================ */
 
 const App = (() => {
+
+    /* ── RAF handles cho north star icons ── */
+    let _northSmallRaf = null;
+    let _northLargeRaf = null;
+    let _northSmallPaused = false;
+    let _northLargePaused = false;
 
     function boot() {
         Canvas.initLanding();
@@ -45,6 +58,10 @@ const App = (() => {
         landing.style.pointerEvents = 'none';
 
         await _sleep(800);
+
+        // ── Dừng landing canvas RAF ──
+        Canvas.stopLanding();
+
         landing.classList.remove('active');
         landing.style.display = 'none';
 
@@ -70,13 +87,9 @@ const App = (() => {
 
         Missions.init();
 
-        // Inject CSS cho preview popup
         _injectPreviewCSS();
-
-        // Khởi tạo star type selector
         _initStarTypeSelector();
 
-        // Gắn hooks ghi nhận giao dịch
         _hookSendSignal();
         _hookShootingStar();
         _hookVoid();
@@ -192,17 +205,23 @@ const App = (() => {
 
         container.innerHTML = '';
 
+        // Dừng RAF cũ nếu re-init
+        if (_northSmallRaf) { cancelAnimationFrame(_northSmallRaf); _northSmallRaf = null; }
+        if (_northLargeRaf) { cancelAnimationFrame(_northLargeRaf); _northLargeRaf = null; }
+
         const PREVIEW_DESCS = {
             shooting: 'Bay vút nhanh lên trời\nTan biến sau 4 giờ',
             north: 'Bay chậm, sáng rực rỡ\nTồn tại vĩnh viễn',
             cluster: '3 cụm sao nối nhau\nTồn tại trong 24 giờ'
         };
-
         const TTL_LABELS = {
             shooting: '4 giờ',
             north: 'Vĩnh viễn',
             cluster: '24 giờ'
         };
+
+        let northSmallCv = null;
+        let northLargeCv = null;
 
         Object.values(CONFIG.STAR_TYPES).forEach(type => {
             const btn = document.createElement('button');
@@ -223,13 +242,13 @@ const App = (() => {
                 padding: 0;
             `;
 
-            // Icon canvas nhỏ trong nút
+            // Icon canvas nhỏ
             const cv = document.createElement('canvas');
             cv.width = 56; cv.height = 56;
             cv.style.cssText = 'width:28px;height:28px;pointer-events:none;display:block;';
             btn.appendChild(cv);
 
-            // Badge TTL nhỏ góc trên phải
+            // Badge TTL
             const badge = document.createElement('span');
             badge.style.cssText = `
                 position:absolute; top:-4px; right:-4px;
@@ -246,11 +265,10 @@ const App = (() => {
                 : '∞';
             btn.appendChild(badge);
 
-            // ── Preview popup ──
+            // Preview popup
             const preview = document.createElement('div');
             preview.className = 'star-type-preview';
 
-            // Canvas preview lớn
             const previewCv = document.createElement('canvas');
             previewCv.width = 96; previewCv.height = 96;
             previewCv.style.cssText = 'width:48px;height:48px;pointer-events:none;display:block;';
@@ -274,37 +292,56 @@ const App = (() => {
 
             btn.appendChild(preview);
 
-            // Click
             btn.addEventListener('click', () => _selectStarType(type.id));
 
-            // Hover desktop
-            btn.addEventListener('mouseenter', () => preview.classList.add('show'));
-            btn.addEventListener('mouseleave', () => preview.classList.remove('show'));
+            // Hover: bắt đầu / dừng large anim
+            btn.addEventListener('mouseenter', () => {
+                preview.classList.add('show');
+                if (type.id === 'north') {
+                    _northLargePaused = false;
+                    if (!_northLargeRaf) _animateNorthIconLarge(northLargeCv);
+                }
+            });
+            btn.addEventListener('mouseleave', () => {
+                preview.classList.remove('show');
+                if (type.id === 'north') _northLargePaused = true;
+            });
 
-            // Touch mobile: show thoáng qua
+            // Touch mobile
             btn.addEventListener('touchstart', () => {
                 preview.classList.add('show');
-                setTimeout(() => preview.classList.remove('show'), 1800);
+                if (type.id === 'north') {
+                    _northLargePaused = false;
+                    if (!_northLargeRaf) _animateNorthIconLarge(northLargeCv);
+                }
+                setTimeout(() => {
+                    preview.classList.remove('show');
+                    if (type.id === 'north') _northLargePaused = true;
+                }, 1800);
             }, { passive: true });
 
             container.appendChild(btn);
 
-            // Vẽ icon nhỏ
-            _drawStarIcon(cv.getContext('2d'), type.id);
-            if (type.id === 'north') _animateNorthIcon(cv);
-
-            // Vẽ icon lớn trong preview
-            _drawStarIconLarge(previewCv.getContext('2d'), type.id);
-            if (type.id === 'north') _animateNorthIconLarge(previewCv);
+            // Vẽ icon tĩnh cho shooting + cluster
+            if (type.id !== 'north') {
+                _drawStarIcon(cv.getContext('2d'), type.id);
+                _drawStarIconLarge(previewCv.getContext('2d'), type.id);
+            } else {
+                // North: lưu ref canvas, animate nhỏ luôn (nhẹ), large chỉ khi hover
+                northSmallCv = cv;
+                northLargeCv = previewCv;
+                _animateNorthIcon(northSmallCv);
+                // Large: KHÔNG bắt đầu ngay — chờ hover
+            }
         });
 
         _applyActiveStyle(STATE.activeStarType);
     }
 
-    /* ── Vẽ icon nhỏ (56×56) cho nút ── */
+    /* ── Vẽ icon nhỏ (56×56) tĩnh ── */
     function _drawStarIcon(ctx, typeId) {
-        const w = 56, h = 56, cx = 28, cy = 28;
-        ctx.clearRect(0, 0, w, h);
+        const w = 56, cy = 28;
+        ctx.clearRect(0, 0, w, w);
 
         if (typeId === 'shooting') {
             const g = ctx.createLinearGradient(4, cy, w - 6, cy);
@@ -343,13 +380,12 @@ const App = (() => {
                 ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
             });
         }
-        // north: animated separately
     }
 
-    /* ── Vẽ icon lớn (96×96) cho preview ── */
+    /* ── Vẽ icon lớn (96×96) tĩnh ── */
     function _drawStarIconLarge(ctx, typeId) {
-        const w = 96, h = 96, cx = 48, cy = 48;
-        ctx.clearRect(0, 0, w, h);
+        const w = 96, cy = 48;
+        ctx.clearRect(0, 0, w, w);
 
         if (typeId === 'shooting') {
             const g = ctx.createLinearGradient(8, cy, w - 10, cy);
@@ -387,7 +423,6 @@ const App = (() => {
                 ctx.fillStyle = `rgba(212,184,255,${alpha})`;
                 ctx.beginPath(); ctx.arc(x, cy, r, 0, Math.PI * 2); ctx.fill();
 
-                // mini vệ tinh xoay quanh chùm sao
                 for (let k = 0; k < 3; k++) {
                     const angle = (k / 3) * Math.PI * 2;
                     ctx.fillStyle = `rgba(212,184,255,${alpha * 0.4})`;
@@ -397,26 +432,32 @@ const App = (() => {
                 }
             });
         }
-        // north: animated separately
     }
 
-    /* ── Animate north icon nhỏ ── */
-    let _northAnimId = null;
+    /* ── Animate north icon nhỏ (luôn chạy, nhẹ) ── */
     function _animateNorthIcon(cv) {
-        if (_northAnimId) cancelAnimationFrame(_northAnimId);
+        if (!cv) return;
+        if (_northSmallRaf) cancelAnimationFrame(_northSmallRaf);
         let t = 0;
-        function frame() {
-            const ctx = cv.getContext('2d');
-            const w = 56, h = 56, cx = 28, cy = 28;
-            ctx.clearRect(0, 0, w, h);
 
-            const pulse = 1 + 0.1 * Math.sin(t * 0.06);
-            const og = ctx.createRadialGradient(cx, cy, 0, cx, cy, 14 * pulse);
-            og.addColorStop(0, 'rgba(255,248,194,0.55)');
+        function frame() {
+            // Pause nếu tab ẩn
+            if (document.hidden) { _northSmallRaf = requestAnimationFrame(frame); return; }
+
+            const ctx = cv.getContext('2d');
+            const cx = 28, cy = 28;
+            ctx.clearRect(0, 0, 56, 56);
+
+            const pulse = 1 + 0.1 * Math.sin(t * 0.05);
+
+            // Glow nhẹ — không dùng shadowBlur
+            const og = ctx.createRadialGradient(cx, cy, 0, cx, cy, 13 * pulse);
+            og.addColorStop(0, 'rgba(255,248,194,0.5)');
             og.addColorStop(1, 'rgba(255,248,194,0)');
             ctx.fillStyle = og;
-            ctx.beginPath(); ctx.arc(cx, cy, 14 * pulse, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx, cy, 13 * pulse, 0, Math.PI * 2); ctx.fill();
 
+            // 4-cánh star
             const r1 = 9 * pulse, r2 = 3;
             ctx.fillStyle = '#fff8c2';
             ctx.beginPath();
@@ -428,44 +469,50 @@ const App = (() => {
                 ctx.lineTo(cx + r2 * Math.cos(a2), cy + r2 * Math.sin(a2));
             }
             ctx.closePath(); ctx.fill();
+
             t++;
-            _northAnimId = requestAnimationFrame(frame);
+            _northSmallRaf = requestAnimationFrame(frame);
         }
         frame();
     }
 
-    /* ── Animate north icon lớn trong preview ── */
-    let _northAnimLargeId = null;
+    /* ── Animate north icon lớn (CHỈ khi preview hiện) ── */
     function _animateNorthIconLarge(cv) {
-        if (_northAnimLargeId) cancelAnimationFrame(_northAnimLargeId);
+        if (!cv) return;
+        if (_northLargeRaf) cancelAnimationFrame(_northLargeRaf);
         let t = 0;
+
         function frame() {
+            // Dừng nếu pause hoặc tab ẩn
+            if (_northLargePaused || document.hidden) {
+                _northLargeRaf = null;
+                return;
+            }
+
             const ctx = cv.getContext('2d');
-            const w = 96, h = 96, cx = 48, cy = 48;
-            ctx.clearRect(0, 0, w, h);
+            const cx = 48, cy = 48;
+            ctx.clearRect(0, 0, 96, 96);
 
             const pulse = 1 + 0.12 * Math.sin(t * 0.06);
 
-            // outer glow
+            // Outer glow — radial gradient thay shadowBlur
             const og = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26 * pulse);
-            og.addColorStop(0, 'rgba(255,248,194,0.45)');
-            og.addColorStop(0.5, 'rgba(255,248,194,0.15)');
+            og.addColorStop(0, 'rgba(255,248,194,0.4)');
+            og.addColorStop(0.5, 'rgba(255,248,194,0.12)');
             og.addColorStop(1, 'rgba(255,248,194,0)');
             ctx.fillStyle = og;
             ctx.beginPath(); ctx.arc(cx, cy, 26 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            // inner corona
-            const ic = ctx.createRadialGradient(cx, cy, 0, cx, cy, 14 * pulse);
-            ic.addColorStop(0, 'rgba(255,255,220,0.7)');
+            // Inner corona
+            const ic = ctx.createRadialGradient(cx, cy, 0, cx, cy, 13 * pulse);
+            ic.addColorStop(0, 'rgba(255,255,220,0.65)');
             ic.addColorStop(1, 'rgba(255,248,194,0)');
             ctx.fillStyle = ic;
-            ctx.beginPath(); ctx.arc(cx, cy, 14 * pulse, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx, cy, 13 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            // 4-cánh star
+            // 4-cánh star (không dùng shadowBlur)
             const r1 = 17 * pulse, r2 = 5;
             ctx.fillStyle = '#fff8c2';
-            ctx.shadowColor = 'rgba(255,248,194,0.9)';
-            ctx.shadowBlur = 8 * pulse;
             ctx.beginPath();
             for (let i = 0; i < 4; i++) {
                 const a = (i * Math.PI / 2) - Math.PI / 2;
@@ -475,21 +522,20 @@ const App = (() => {
                 ctx.lineTo(cx + r2 * Math.cos(a2), cy + r2 * Math.sin(a2));
             }
             ctx.closePath(); ctx.fill();
-            ctx.shadowBlur = 0;
 
-            // sparkles xoay quanh
+            // Sparkles xoay (chỉ 4 điểm nhỏ)
             for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2 + t * 0.018;
-                const dist = 22 * pulse;
-                const sx = cx + dist * Math.cos(angle);
-                const sy = cy + dist * Math.sin(angle);
-                const sparkAlpha = 0.3 + 0.3 * Math.sin(t * 0.05 + i);
-                ctx.fillStyle = `rgba(255,248,194,${sparkAlpha})`;
-                ctx.beginPath(); ctx.arc(sx, sy, 1.5, 0, Math.PI * 2); ctx.fill();
+                const angle = (i / 4) * Math.PI * 2 + t * 0.016;
+                const dist = 21 * pulse;
+                const alpha = 0.28 + 0.28 * Math.sin(t * 0.05 + i);
+                ctx.fillStyle = `rgba(255,248,194,${alpha.toFixed(2)})`;
+                ctx.beginPath();
+                ctx.arc(cx + dist * Math.cos(angle), cy + dist * Math.sin(angle), 1.4, 0, Math.PI * 2);
+                ctx.fill();
             }
 
             t++;
-            _northAnimLargeId = requestAnimationFrame(frame);
+            _northLargeRaf = requestAnimationFrame(frame);
         }
         frame();
     }
@@ -499,18 +545,19 @@ const App = (() => {
         STATE.activeStarType = typeId;
         _applyActiveStyle(typeId);
 
-        // Bounce animation
         const btn = document.getElementById(`star-type-btn-${typeId}`);
         if (btn) {
             btn.classList.remove('selected-active');
-            // Force reflow để restart animation
             void btn.offsetWidth;
             btn.classList.add('selected-active');
             setTimeout(() => btn.classList.remove('selected-active'), 400);
 
-            // Ẩn preview sau khi chọn
             const preview = btn.querySelector('.star-type-preview');
-            if (preview) preview.classList.remove('show');
+            if (preview) {
+                preview.classList.remove('show');
+                // Dừng large anim sau khi chọn
+                _northLargePaused = true;
+            }
         }
     }
 
@@ -523,19 +570,16 @@ const App = (() => {
             b.style.background = isActive
                 ? 'rgba(156,125,255,0.18)'
                 : 'rgba(255,255,255,0.04)';
-            if (isActive) {
-                b.style.boxShadow = '0 0 10px rgba(156,125,255,0.25)';
-            } else {
-                b.style.boxShadow = '';
-            }
+            b.style.boxShadow = isActive
+                ? '0 0 10px rgba(156,125,255,0.25)'
+                : '';
         });
     }
 
-    /* ── Hook: Gửi tín hiệu → ghi +5 vào lịch sử ── */
+    /* ── Hooks ── */
     function _hookSendSignal() {
         const btn = document.getElementById('btn-send');
         if (!btn) return;
-
         btn.addEventListener('click', () => {
             const text = document.getElementById('signal-text')?.value?.trim();
             if (!text) return;
@@ -557,21 +601,18 @@ const App = (() => {
         }, false);
     }
 
-    /* ── Hook: Bắt sao băng → +50 ── */
     function _hookShootingStar() {
         document.addEventListener('shootingstar:caught', () => {
             NotifSystem.add('bonus', `+${CONFIG.POINTS.SHOOTING_STAR}`, 'Bắt được sao băng! 🌠');
         });
     }
 
-    /* ── Hook: Hố đen hoàn thành → +10 ── */
     function _hookVoid() {
         document.addEventListener('void:released', () => {
             NotifSystem.add('earn', `+${CONFIG.POINTS.VOID_HOLD}`, 'Buông bỏ tại Hố Đen 🌑');
         });
     }
 
-    /* ── Hook: Mưa sao băng → +30 ── */
     function _hookMeteorRain() {
         document.addEventListener('meteorrain:bonus', () => {
             NotifSystem.add('bonus', '+30', 'Mưa sao băng may mắn! 🌠');

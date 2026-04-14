@@ -15,9 +15,10 @@
     <link rel="stylesheet" href="css/animations.css" />
     <link rel="stylesheet" href="css/components.css" />
     <link rel="stylesheet" href="css/logout-modal.css" />
-    <link rel="stylesheet" href="css/AstronautTimer.css" />
-    <!-- Hố Đen v3 — thay thế phần void trong style.css -->
+    <link rel="stylesheet" href="css/astronautTimer.css" />
     <link rel="stylesheet" href="css/blackhole.css" />
+    <link rel="stylesheet" href="css/streak.css" />
+    <link rel="stylesheet" href="css/mobile.css" />
 </head>
 
 <body>
@@ -74,6 +75,7 @@
                 <span class="nav-logo-icon">🔭</span>
                 <span class="nav-logo-text">TRẠM GỬI TÍN HIỆU</span>
             </div>
+            <!-- Desktop nav links (ẩn trên mobile) -->
             <div class="nav-links">
                 <button class="nav-link active" data-section="universe">Vũ Trụ</button>
                 <button class="nav-link" id="btn-missions">Nhiệm Vụ</button>
@@ -123,10 +125,8 @@
                 <div class="void-shadow"></div>
                 <div class="void-spiral"></div>
                 <div class="void-core"></div>
-                <!-- Timer: không hidden mặc định, BlackHole.init() tự quản lý -->
                 <div class="void-timer" id="void-timer">
                     <svg viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
-                        <!-- gradient được inject bởi blackhole.js -->
                         <circle cx="72" cy="72" r="66" class="timer-track" />
                         <circle cx="72" cy="72" r="66" class="timer-progress" id="timer-progress" />
                     </svg>
@@ -194,9 +194,8 @@
         <!-- ===== SHOOTING STAR HINT ===== -->
         <div class="shooting-star-hint hidden" id="shooting-hint">✨ Bắt ngôi sao băng!</div>
 
-        <!-- ===== STAR POPUP — redesign ===== -->
+        <!-- ===== STAR POPUP ===== -->
         <div class="star-popup glass hidden" id="star-popup">
-
             <div class="star-popup-header">
                 <div class="star-popup-meta">
                     <span class="anon-label" id="popup-username">Ẩn danh ✦</span>
@@ -205,15 +204,12 @@
                 <span class="popup-mood-tag hidden" id="popup-mood-tag">💜 Tâm sự buồn</span>
                 <button class="popup-close" id="popup-close">✕</button>
             </div>
-
             <p class="star-popup-text" id="star-popup-text"></p>
-
             <div class="react-counts-row">
                 <span class="react-count-item" id="count-listen">🕯️ 0</span>
                 <span class="react-count-item" id="count-hug">❤️ 0</span>
                 <span class="react-count-item" id="count-strong">⚡ 0</span>
             </div>
-
             <div class="reaction-btns">
                 <div class="react-btn-wrap">
                     <button class="react-btn" data-reaction="listen">🕯️</button>
@@ -228,7 +224,6 @@
                     <span class="react-label-text">Mạnh mẽ</span>
                 </div>
             </div>
-
         </div>
 
         <!-- ===== PATIENT ASTRONAUT TIMER ===== -->
@@ -288,6 +283,30 @@
             <div class="telescope-icon" id="telescope-icon"><span>🔭</span></div>
         </div>
 
+        <!-- ===== BOTTOM NAV BAR (mobile only) ===== -->
+        <nav class="bottom-nav" id="bottom-nav">
+            <button class="bn-item active" id="bn-universe" data-section="universe">
+                <span class="bn-icon">🌌</span>
+                <span class="bn-label">Vũ Trụ</span>
+            </button>
+            <button class="bn-item" id="bn-missions">
+                <span class="bn-icon">⭐<span class="bn-badge hidden" id="bn-missions-badge">0</span></span>
+                <span class="bn-label">Nhiệm Vụ</span>
+            </button>
+            <button class="bn-send" id="bn-send-btn">
+                <span class="bn-send-icon">✦</span>
+                <span class="bn-send-label">GỬI</span>
+            </button>
+            <button class="bn-item" id="bn-store">
+                <span class="bn-icon">🛸</span>
+                <span class="bn-label">Store</span>
+            </button>
+            <button class="bn-item" id="bn-heal">
+                <span class="bn-icon">💜</span>
+                <span class="bn-label">Chữa Lành</span>
+            </button>
+        </nav>
+
     </div>
 
     <!-- ===== HEAL PANEL ===== -->
@@ -318,39 +337,11 @@
     <script src="js/sound.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
-    <!-- Hố Đen v3 — load sau app.js để Stars đã sẵn sàng -->
     <script src="js/blackhole.js"></script>
+    <script src="js/updateavatar.js"></script>
+    <script src="js/mobile-nav.js"></script>
+    <script src="js/sound-toggle.js"></script>
 
-    <script>
-        /* ── Avatar initials ── */
-        (function () {
-            function updateAvatar() {
-                const nicknameEl = document.getElementById('user-nickname');
-                const avatarEl = document.getElementById('user-avatar');
-                if (!nicknameEl || !avatarEl) return;
-                const nick = nicknameEl.textContent.trim();
-                if (!nick || nick === '--') return;
-                const letters = nick.replace(/[^a-zA-Z0-9]/g, '');
-                avatarEl.textContent = (letters.slice(0, 2) || nick.slice(0, 2)).toUpperCase();
-            }
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', updateAvatar);
-            } else { updateAvatar(); }
-            const obs = new MutationObserver(updateAvatar);
-            function watchNickname() {
-                const t = document.getElementById('user-nickname');
-                if (t) obs.observe(t, { childList: true, characterData: true, subtree: true });
-            }
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', watchNickname);
-            } else { watchNickname(); }
-        })();
-
-        /* ── Khởi động BlackHole sau khi DOM + scripts sẵn sàng ── */
-        document.addEventListener('DOMContentLoaded', () => {
-            if (typeof BlackHole !== 'undefined') BlackHole.init();
-        });
-    </script>
 </body>
 
 </html>

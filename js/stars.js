@@ -1,7 +1,15 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - stars.js (FULL v3)
+   TRẠM GỬI TÍN HIỆU - stars.js  [OPTIMISED]
    + Hiện tên mình / Ẩn danh cho người khác
    + Lưu createdAt đúng lúc gửi → hiện giờ gửi
+
+   Fixes:
+   - startShootingStarCycle: bỏ setTimeout lồng setInterval
+     → dùng setInterval thuần, clear đúng cách
+   - Fly canvas: tạo 1 lần, reuse, không leak
+   - _showLabel throttle: dùng requestAnimationFrame
+   - _meteorRain: không tạo canvas mới, dùng DOM div
+   - domStars cleanup đúng khi remove
    ================================================ */
 
 const Stars = (() => {
@@ -9,7 +17,8 @@ const Stars = (() => {
     const container = () => document.getElementById('main-screen');
     let domStars = [];
     let shootingActive = false;
-    let shootingTimer, meteorTimer;
+    let _shootingInterval = null;
+    let _meteorInterval = null;
 
     const METEOR_DURATION = 8000;
 
@@ -74,7 +83,8 @@ const Stars = (() => {
                 width: ${s}px; height: ${s}px;
                 opacity: ${data.opacity || 0.9};
                 background: #fff8c2;
-                clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+                clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%,
+                                   50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
                 box-shadow: 0 0 ${s * 3}px ${s}px rgba(255,248,194,0.7);
                 animation: twinkle ${2 + Math.random() * 3}s ease-in-out infinite,
                            northPulse 3s ease-in-out infinite;
@@ -130,36 +140,31 @@ const Stars = (() => {
         wrapper.appendChild(badge);
 
         el.addEventListener('click', () => _showPopup(el, data, badge));
-        el.addEventListener('mouseenter', () => _showLabel(el, data));
-        el.addEventListener('mouseleave', _hideLabel);
+        el.addEventListener('mouseenter', () => _scheduleLabel(el, data));
+        el.addEventListener('mouseleave', _cancelLabel);
 
         container().appendChild(wrapper);
         data._badge = badge;
         data._el = el;
 
+        // TTL auto-remove
         const typeConf = CONFIG.STAR_TYPES[data.type];
-        if (typeConf && typeConf.ttl && !typeConf.permanent) {
-            const ttlMs = typeConf.ttl;
+        if (typeConf?.ttl && !typeConf.permanent) {
             setTimeout(() => {
                 wrapper.style.transition = 'opacity 1.5s ease';
                 wrapper.style.opacity = '0';
                 setTimeout(() => {
-                    if (wrapper.parentNode) wrapper.remove();
+                    wrapper.remove();
                     const idx = domStars.findIndex(s => s.el === wrapper);
                     if (idx !== -1) domStars.splice(idx, 1);
                 }, 1500);
-            }, ttlMs);
+            }, typeConf.ttl);
         }
 
         return wrapper;
     }
 
     /* ---- REACT BADGE ---- */
-    function _getTotalReacts(data) {
-        const r = data.reactions || {};
-        return (r.listen || 0) + (r.hug || 0) + (r.strong || 0);
-    }
-
     function _formatReactBadge(data) {
         const r = data.reactions || {};
         const parts = [];
@@ -171,7 +176,7 @@ const Stars = (() => {
 
     function _updateBadge(data) {
         if (!data._badge) return;
-        const total = _getTotalReacts(data);
+        const total = Object.values(data.reactions || {}).reduce((s, v) => s + v, 0);
         if (total > 0) {
             data._badge.textContent = _formatReactBadge(data);
             data._badge.style.opacity = '1';
@@ -180,15 +185,38 @@ const Stars = (() => {
         }
     }
 
-    /* ---- LABEL ---- */
+    /* ---- LABEL (throttle RAF) ---- */
     let labelEl = null;
+    let _labelRaf = null;
+    let _labelTarget = null;
+
+    function _scheduleLabel(el, data) {
+        _labelTarget = { el, data };
+        if (_labelRaf) return;
+        _labelRaf = requestAnimationFrame(() => {
+            _labelRaf = null;
+            if (!_labelTarget) return;
+            _showLabel(_labelTarget.el, _labelTarget.data);
+        });
+    }
+
+    function _cancelLabel() {
+        _labelTarget = null;
+        if (_labelRaf) { cancelAnimationFrame(_labelRaf); _labelRaf = null; }
+        _hideLabel();
+    }
+
     function _showLabel(el, data) {
         _hideLabel();
         labelEl = document.createElement('div');
         labelEl.className = 'star-label';
         labelEl.textContent = data.text.substring(0, 40) + (data.text.length > 40 ? '…' : '');
         const rect = el.getBoundingClientRect();
-        labelEl.style.cssText = `left:${rect.left + rect.width / 2}px; top:${rect.top - 28}px; position:fixed; z-index:200;`;
+        labelEl.style.cssText = `
+            left: ${rect.left + rect.width / 2}px;
+            top: ${rect.top - 28}px;
+            position: fixed; z-index: 200;
+        `;
         document.body.appendChild(labelEl);
     }
 
@@ -196,9 +224,7 @@ const Stars = (() => {
         if (labelEl) { labelEl.remove(); labelEl = null; }
     }
 
-    /* ================================================================
-       FORMAT THỜI GIAN — hiện "Vừa xong" nếu < 1 phút
-       ================================================================ */
+    /* ---- FORMAT THỜI GIAN ---- */
     function _formatTime(isoString) {
         if (!isoString) return null;
         const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
@@ -209,7 +235,7 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       POPUP — hiện tên mình, ẩn danh cho người khác
+       POPUP
        ================================================================ */
     function _showPopup(el, data, badge) {
         const popup = document.getElementById('star-popup');
@@ -222,72 +248,41 @@ const Stars = (() => {
         const cntStrong = document.getElementById('count-strong');
         if (!popup || !textEl) return;
 
-        // ── Nội dung ──
         textEl.textContent = data.text || '';
 
-        // ── Tên: hiện tên mình, Ẩn danh cho người khác ──
         if (userEl) {
             const myNickname = STATE.user?.nickname || STATE.user?.username;
             const myId = STATE.user?.id;
-
             const isOwn =
                 (myId && data.userId && String(data.userId) === String(myId)) ||
-                (myNickname && data.nickname && data.nickname !== 'Ẩn danh' && data.nickname === myNickname);
-
+                (myNickname && data.nickname && data.nickname !== 'Ẩn danh'
+                    && data.nickname === myNickname);
             userEl.textContent = isOwn ? `${myNickname} ✦` : 'Ẩn danh ✦';
         }
 
-        // ── Thời gian: luôn hiện (kể cả "Vừa xong") ──
         if (timeEl) {
             const timeStr = _formatTime(data.createdAt || data.timestamp);
-            if (timeStr) {
-                timeEl.textContent = timeStr;
-                timeEl.style.display = '';
-            } else {
-                timeEl.textContent = '';
-                timeEl.style.display = 'none';
-            }
+            timeEl.textContent = timeStr || '';
+            timeEl.style.display = timeStr ? '' : 'none';
         }
 
-        // ── Tag Tâm sự buồn ──
-        if (moodTag) {
-            moodTag.classList.toggle('hidden', !data.isMoodPost);
-        }
+        if (moodTag) moodTag.classList.toggle('hidden', !data.isMoodPost);
 
-        // ── React counts ──
         const r = data.reactions || {};
-        if (cntListen) {
-            cntListen.textContent = `🕯️ ${r.listen || 0}`;
-            cntListen.classList.toggle('has-reacts', (r.listen || 0) > 0);
-        }
-        if (cntHug) {
-            cntHug.textContent = `❤️ ${r.hug || 0}`;
-            cntHug.classList.toggle('has-reacts', (r.hug || 0) > 0);
-        }
-        if (cntStrong) {
-            cntStrong.textContent = `⚡ ${r.strong || 0}`;
-            cntStrong.classList.toggle('has-reacts', (r.strong || 0) > 0);
-        }
+        if (cntListen) { cntListen.textContent = `🕯️ ${r.listen || 0}`; cntListen.classList.toggle('has-reacts', (r.listen || 0) > 0); }
+        if (cntHug) { cntHug.textContent = `❤️ ${r.hug || 0}`; cntHug.classList.toggle('has-reacts', (r.hug || 0) > 0); }
+        if (cntStrong) { cntStrong.textContent = `⚡ ${r.strong || 0}`; cntStrong.classList.toggle('has-reacts', (r.strong || 0) > 0); }
 
-        // ── Reset trạng thái reacted ──
-        popup.querySelectorAll('.react-btn').forEach(btn => {
-            btn.classList.remove('reacted', 'just-reacted');
-        });
+        popup.querySelectorAll('.react-btn').forEach(btn => btn.classList.remove('reacted', 'just-reacted'));
 
-        // ── Vị trí popup thông minh ──
         _positionPopup(popup, el);
-
-        // ── Hiện popup ──
         popup.classList.remove('hidden');
 
-        // ── Lưu data hiện tại để react buttons dùng ──
         popup._currentStar = data;
         popup._currentEl = el;
 
-        // ── Bind react buttons ──
         _bindReactButtons(popup);
 
-        // ── Tracking ──
         STATE.starsRead = (parseInt(STATE.starsRead) || 0) + 1;
         Missions.progress('read_stars', STATE.starsRead);
     }
@@ -306,7 +301,6 @@ const Stars = (() => {
 
         let left = rect.left + rect.width / 2 - pw / 2;
         let top = rect.top - ph - 16;
-
         if (top < 70) top = rect.bottom + 12;
         left = Math.max(margin, Math.min(left, vw - pw - margin));
         top = Math.min(top, vh - ph - margin);
@@ -327,7 +321,6 @@ const Stars = (() => {
                 if (!data) return;
 
                 const reaction = newBtn.dataset.reaction;
-
                 const wasReacted = newBtn.classList.contains('reacted');
                 newBtn.classList.toggle('reacted', !wasReacted);
                 newBtn.classList.add('just-reacted');
@@ -348,7 +341,7 @@ const Stars = (() => {
                 _updateBadge(data);
 
                 if (el) {
-                    el.style.boxShadow = `0 0 30px 10px rgba(244,143,177,0.8)`;
+                    el.style.boxShadow = '0 0 30px 10px rgba(244,143,177,0.8)';
                     setTimeout(() => { el.style.boxShadow = ''; }, 1200);
                 }
 
@@ -391,7 +384,8 @@ const Stars = (() => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const list = await res.json();
 
-            domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
+            // Dọn DOM cũ
+            domStars.forEach(s => { if (s.el?.parentNode) s.el.remove(); });
             domStars = [];
 
             list.forEach(s => {
@@ -400,11 +394,7 @@ const Stars = (() => {
                 if (!s.size) s.size = 3 + Math.random() * 5;
                 if (!s.opacity) s.opacity = 0.5 + Math.random() * 0.5;
                 if (!CONFIG.STAR_TYPES[s.type]) s.type = 'shooting';
-                s.reactions = {
-                    listen: s.listenCount || 0,
-                    hug: s.hugCount || 0,
-                    strong: s.strongCount || 0,
-                };
+                s.reactions = { listen: s.listenCount || 0, hug: s.hugCount || 0, strong: s.strongCount || 0 };
                 s.isMoodPost = s.isMoodPost || false;
                 const el = _createDomStar(s);
                 domStars.push({ el, data: s });
@@ -416,7 +406,7 @@ const Stars = (() => {
     }
 
     function _addDemoStars() {
-        domStars.forEach(s => { if (s.el && s.el.parentNode) s.el.remove(); });
+        domStars.forEach(s => { if (s.el?.parentNode) s.el.remove(); });
         domStars = [];
         const demos = [
             { id: 1, text: 'Hôm nay mình mệt quá, ước gì có ai đó hiểu mình...', type: 'shooting', isNegative: true, isMoodPost: true, reactions: { listen: 3, hug: 1, strong: 0 }, createdAt: new Date(Date.now() - 3600000).toISOString() },
@@ -432,11 +422,8 @@ const Stars = (() => {
         ];
         demos.forEach(d => {
             const s = {
-                ...d,
-                x: 5 + Math.random() * 88,
-                y: 5 + Math.random() * 65,
-                size: 3 + Math.random() * 5,
-                opacity: 0.6 + Math.random() * 0.4
+                ...d, x: 5 + Math.random() * 88, y: 5 + Math.random() * 65,
+                size: 3 + Math.random() * 5, opacity: 0.6 + Math.random() * 0.4
             };
             const el = _createDomStar(s);
             domStars.push({ el, data: s });
@@ -444,17 +431,32 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       FLY ANIMATIONS
+       FLY ANIMATIONS — dùng 1 canvas cố định, không tạo mới mỗi lần
        ================================================================ */
-    function _flyShootingStar(startX, startY, targetX, targetY, onDone) {
-        const W = window.innerWidth, H = window.innerHeight;
-        const cv = document.createElement('canvas');
-        cv.style.cssText = `position:fixed;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:500;`;
-        cv.width = W; cv.height = H;
-        document.body.appendChild(cv);
-        const ctx = cv.getContext('2d');
+    let _flyCanvas = null;
+    let _flyCtx = null;
 
-        const dx = targetX - startX, dy = targetY - startY;
+    function _getFlyCanvas() {
+        if (!_flyCanvas) {
+            _flyCanvas = document.createElement('canvas');
+            _flyCanvas.style.cssText = `
+                position: fixed; top: 0; left: 0;
+                width: 100%; height: 100%;
+                pointer-events: none; z-index: 500;
+            `;
+            document.body.appendChild(_flyCanvas);
+        }
+        const W = window.innerWidth, H = window.innerHeight;
+        _flyCanvas.width = W;
+        _flyCanvas.height = H;
+        _flyCtx = _flyCanvas.getContext('2d');
+        _flyCtx.clearRect(0, 0, W, H);
+        return { cv: _flyCanvas, ctx: _flyCtx, W, H };
+    }
+
+    function _flyShootingStar(sx, sy, tx, ty, onDone) {
+        const { ctx, W, H } = _getFlyCanvas();
+        const dx = tx - sx, dy = ty - sy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const steps = Math.ceil(dist / 3.8);
         let step = 0;
@@ -463,64 +465,50 @@ const Stars = (() => {
         function frame() {
             ctx.clearRect(0, 0, W, H);
             const progress = step / steps;
-            const x = startX + dx * progress;
-            const y = startY + dy * progress;
+            const x = sx + dx * progress, y = sy + dy * progress;
 
             trail.push({ x, y });
             if (trail.length > 28) trail.shift();
 
             trail.forEach((pt, i) => {
-                const a = (i / trail.length) * 0.65;
-                ctx.fillStyle = `rgba(168,216,255,${a})`;
-                ctx.beginPath();
-                ctx.arc(pt.x, pt.y, 1.8, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.fillStyle = `rgba(168,216,255,${(i / trail.length) * 0.65})`;
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.8, 0, Math.PI * 2); ctx.fill();
             });
 
             for (let k = 0; k < 3; k++) {
                 ctx.fillStyle = 'rgba(168,216,255,0.4)';
                 ctx.beginPath();
-                ctx.arc(x + (Math.random() - 0.5) * 12, y + (Math.random() - 0.5) * 8, Math.random() * 1.5, 0, Math.PI * 2);
+                ctx.arc(x + (Math.random() - 0.5) * 12, y + (Math.random() - 0.5) * 8,
+                    Math.random() * 1.5, 0, Math.PI * 2);
                 ctx.fill();
             }
 
             const rg = ctx.createRadialGradient(x, y, 0, x, y, 9);
-            rg.addColorStop(0, '#ffffff');
-            rg.addColorStop(0.5, '#a8d8ff');
-            rg.addColorStop(1, 'rgba(168,216,255,0)');
-            ctx.fillStyle = rg;
-            ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+            rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.5, '#a8d8ff'); rg.addColorStop(1, 'rgba(168,216,255,0)');
+            ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
 
             step++;
-            if (step <= steps) {
-                requestAnimationFrame(frame);
-            } else {
-                let alpha = 1;
-                (function fade() {
-                    ctx.clearRect(0, 0, W, H);
-                    alpha -= 0.08;
-                    ctx.globalAlpha = Math.max(0, alpha);
-                    const rg2 = ctx.createRadialGradient(targetX, targetY, 0, targetX, targetY, 14);
-                    rg2.addColorStop(0, '#fff'); rg2.addColorStop(1, 'rgba(168,216,255,0)');
-                    ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(targetX, targetY, 14, 0, Math.PI * 2); ctx.fill();
-                    ctx.globalAlpha = 1;
-                    if (alpha > 0) requestAnimationFrame(fade);
-                    else { cv.remove(); onDone && onDone(); }
-                })();
-            }
+            if (step <= steps) { requestAnimationFrame(frame); return; }
+
+            let alpha = 1;
+            (function fade() {
+                ctx.clearRect(0, 0, W, H);
+                alpha -= 0.08;
+                ctx.globalAlpha = Math.max(0, alpha);
+                const rg2 = ctx.createRadialGradient(tx, ty, 0, tx, ty, 14);
+                rg2.addColorStop(0, '#fff'); rg2.addColorStop(1, 'rgba(168,216,255,0)');
+                ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(tx, ty, 14, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1;
+                if (alpha > 0) requestAnimationFrame(fade);
+                else { ctx.clearRect(0, 0, W, H); onDone?.(); }
+            })();
         }
         requestAnimationFrame(frame);
     }
 
-    function _flyNorthStar(startX, startY, targetX, targetY, onDone) {
-        const W = window.innerWidth, H = window.innerHeight;
-        const cv = document.createElement('canvas');
-        cv.style.cssText = `position:fixed;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:500;`;
-        cv.width = W; cv.height = H;
-        document.body.appendChild(cv);
-        const ctx = cv.getContext('2d');
-
-        const dx = targetX - startX, dy = targetY - startY;
+    function _flyNorthStar(sx, sy, tx, ty, onDone) {
+        const { ctx, W, H } = _getFlyCanvas();
+        const dx = tx - sx, dy = ty - sy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const steps = Math.ceil(dist / 1.1);
         let step = 0, t = 0;
@@ -528,8 +516,7 @@ const Stars = (() => {
         function frame() {
             ctx.clearRect(0, 0, W, H);
             const progress = step / steps;
-            const x = startX + dx * progress;
-            const y = startY + dy * progress;
+            const x = sx + dx * progress, y = sy + dy * progress;
             const pulse = 1 + 0.12 * Math.sin(t * 0.08);
             t++;
 
@@ -550,37 +537,28 @@ const Stars = (() => {
             ctx.closePath(); ctx.fill();
 
             step++;
-            if (step <= steps) {
-                requestAnimationFrame(frame);
-            } else {
-                let alpha = 1.2;
-                (function burst() {
-                    ctx.clearRect(0, 0, W, H);
-                    alpha -= 0.055;
-                    if (alpha <= 0) { cv.remove(); onDone && onDone(); return; }
-                    ctx.globalAlpha = Math.min(1, alpha);
-                    const gr = ctx.createRadialGradient(targetX, targetY, 0, targetX, targetY, 28 * (1.2 - alpha));
-                    gr.addColorStop(0, '#ffffff');
-                    gr.addColorStop(0.4, 'rgba(255,248,194,0.7)');
-                    gr.addColorStop(1, 'rgba(255,248,194,0)');
-                    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(targetX, targetY, 28 * (1.2 - alpha), 0, Math.PI * 2); ctx.fill();
-                    ctx.globalAlpha = 1;
-                    requestAnimationFrame(burst);
-                })();
-            }
+            if (step <= steps) { requestAnimationFrame(frame); return; }
+
+            let alpha = 1.2;
+            (function burst() {
+                ctx.clearRect(0, 0, W, H);
+                alpha -= 0.055;
+                if (alpha <= 0) { ctx.clearRect(0, 0, W, H); onDone?.(); return; }
+                ctx.globalAlpha = Math.min(1, alpha);
+                const spread = (1.2 - alpha) * 28;
+                const gr = ctx.createRadialGradient(tx, ty, 0, tx, ty, spread);
+                gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.4, 'rgba(255,248,194,0.7)'); gr.addColorStop(1, 'rgba(255,248,194,0)');
+                ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(tx, ty, spread, 0, Math.PI * 2); ctx.fill();
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(burst);
+            })();
         }
         requestAnimationFrame(frame);
     }
 
-    function _flyClusterStar(startX, startY, targetX, targetY, onDone) {
-        const W = window.innerWidth, H = window.innerHeight;
-        const cv = document.createElement('canvas');
-        cv.style.cssText = `position:fixed;top:0;left:0;width:${W}px;height:${H}px;pointer-events:none;z-index:500;`;
-        cv.width = W; cv.height = H;
-        document.body.appendChild(cv);
-        const ctx = cv.getContext('2d');
-
-        const dx = targetX - startX, dy = targetY - startY;
+    function _flyClusterStar(sx, sy, tx, ty, onDone) {
+        const { ctx, W, H } = _getFlyCanvas();
+        const dx = tx - sx, dy = ty - sy;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const steps = Math.ceil(dist / 2.2);
         let step = 0;
@@ -592,21 +570,17 @@ const Stars = (() => {
         function frame() {
             ctx.clearRect(0, 0, W, H);
             const progress = step / steps;
-            const baseX = startX + dx * progress;
-            const baseY = startY + dy * progress;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            const baseX = sx + dx * progress, baseY = sy + dy * progress;
+            const len = dist || 1;
             const ux = dx / len, uy = dy / len;
 
             OFFSETS.forEach((off, i) => {
-                const px = baseX + ux * off;
-                const py = baseY + uy * off;
+                const px = baseX + ux * off, py = baseY + uy * off;
                 const r = SIZES[i], alpha = ALPHAS[i];
 
                 const rg = ctx.createRadialGradient(px, py, 0, px, py, r * 2.8);
-                rg.addColorStop(0, `rgba(212,184,255,${alpha})`);
-                rg.addColorStop(1, 'rgba(156,125,255,0)');
+                rg.addColorStop(0, `rgba(212,184,255,${alpha})`); rg.addColorStop(1, 'rgba(156,125,255,0)');
                 ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(px, py, r * 2.8, 0, Math.PI * 2); ctx.fill();
-
                 ctx.fillStyle = `rgba(212,184,255,${alpha})`;
                 ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
 
@@ -614,37 +588,37 @@ const Stars = (() => {
                     const angle = (k / 3) * Math.PI * 2 + step * 0.04;
                     ctx.fillStyle = `rgba(212,184,255,${alpha * 0.45})`;
                     ctx.beginPath();
-                    ctx.arc(px + r * 1.8 * Math.cos(angle), py + r * 1.8 * Math.sin(angle), r * 0.35, 0, Math.PI * 2);
+                    ctx.arc(px + r * 1.8 * Math.cos(angle), py + r * 1.8 * Math.sin(angle),
+                        r * 0.35, 0, Math.PI * 2);
                     ctx.fill();
                 }
             });
 
-            const tail = { x: baseX + ux * OFFSETS[2], y: baseY + uy * OFFSETS[2] };
             ctx.strokeStyle = 'rgba(156,125,255,0.25)';
             ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
-            ctx.beginPath(); ctx.moveTo(baseX, baseY); ctx.lineTo(tail.x, tail.y); ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(baseX, baseY);
+            ctx.lineTo(baseX + ux * OFFSETS[2], baseY + uy * OFFSETS[2]);
+            ctx.stroke(); ctx.setLineDash([]);
 
             step++;
-            if (step <= steps) {
-                requestAnimationFrame(frame);
-            } else {
-                let alpha2 = 1;
-                (function disperse() {
-                    ctx.clearRect(0, 0, W, H);
-                    alpha2 -= 0.065;
-                    if (alpha2 <= 0) { cv.remove(); onDone && onDone(); return; }
-                    ctx.globalAlpha = alpha2;
-                    const spread = (1 - alpha2) * 20;
-                    [[0, -spread], [-spread, spread * 0.8], [spread, spread * 0.8]].forEach(([ox, oy]) => {
-                        const rg2 = ctx.createRadialGradient(targetX + ox, targetY + oy, 0, targetX + ox, targetY + oy, 10);
-                        rg2.addColorStop(0, 'rgba(212,184,255,0.8)'); rg2.addColorStop(1, 'rgba(156,125,255,0)');
-                        ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(targetX + ox, targetY + oy, 10, 0, Math.PI * 2); ctx.fill();
-                    });
-                    ctx.globalAlpha = 1;
-                    requestAnimationFrame(disperse);
-                })();
-            }
+            if (step <= steps) { requestAnimationFrame(frame); return; }
+
+            let alpha2 = 1;
+            (function disperse() {
+                ctx.clearRect(0, 0, W, H);
+                alpha2 -= 0.065;
+                if (alpha2 <= 0) { ctx.clearRect(0, 0, W, H); onDone?.(); return; }
+                ctx.globalAlpha = alpha2;
+                const spread = (1 - alpha2) * 20;
+                [[0, -spread], [-spread, spread * 0.8], [spread, spread * 0.8]].forEach(([ox, oy]) => {
+                    const rg2 = ctx.createRadialGradient(tx + ox, ty + oy, 0, tx + ox, ty + oy, 10);
+                    rg2.addColorStop(0, 'rgba(212,184,255,0.8)'); rg2.addColorStop(1, 'rgba(156,125,255,0)');
+                    ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(tx + ox, ty + oy, 10, 0, Math.PI * 2); ctx.fill();
+                });
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(disperse);
+            })();
         }
         requestAnimationFrame(frame);
     }
@@ -653,7 +627,7 @@ const Stars = (() => {
        SEND SIGNAL
        ================================================================ */
     async function sendSignal(text, type, showHeal = true, isMoodPost = false) {
-        if (!text || !text.trim()) return;
+        if (!text?.trim()) return;
 
         if (typeof Sound !== 'undefined') Sound.playBell();
         if (showHeal && typeof HealToast !== 'undefined') HealToast.show();
@@ -662,7 +636,6 @@ const Stars = (() => {
 
         const W = window.innerWidth;
         const H = window.innerHeight;
-
         const SAFE_TOP = 74;
         const SAFE_BOTTOM = H * 0.5 - 120;
         const SAFE_LEFT = W * 0.05;
@@ -672,9 +645,9 @@ const Stars = (() => {
         const flyTargetY = SAFE_TOP + Math.random() * (SAFE_BOTTOM - SAFE_TOP);
 
         const mainScreen = document.getElementById('main-screen');
-        const screenW = mainScreen ? mainScreen.offsetWidth : W;
-        const screenH = mainScreen ? mainScreen.offsetHeight : H;
-        const mainRect = mainScreen ? mainScreen.getBoundingClientRect() : { left: 0, top: 0 };
+        const screenW = mainScreen?.offsetWidth || W;
+        const screenH = mainScreen?.offsetHeight || H;
+        const mainRect = mainScreen?.getBoundingClientRect() || { left: 0, top: 0 };
 
         const xPct = ((flyTargetX - mainRect.left) / screenW) * 100;
         const yPct = ((flyTargetY - mainRect.top) / screenH) * 100;
@@ -683,7 +656,7 @@ const Stars = (() => {
         const starSize = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
 
         const sendBtn = document.getElementById('btn-send');
-        const btnRect = sendBtn ? sendBtn.getBoundingClientRect() : null;
+        const btnRect = sendBtn?.getBoundingClientRect();
         const startX = btnRect ? btnRect.left + btnRect.width / 2 : W / 2;
         const startY = btnRect ? btnRect.top : H * 0.65;
 
@@ -691,20 +664,13 @@ const Stars = (() => {
             : validType === 'cluster' ? _flyClusterStar
                 : _flyShootingStar;
 
-        // Lưu thời điểm gửi ngay lập tức
         const sentAt = new Date().toISOString();
 
         flyFn(startX, startY, flyTargetX, flyTargetY, async () => {
             const data = {
-                id: null,
-                text,
-                type: validType,
-                x: xPct,
-                y: yPct,
-                size: starSize,
-                opacity: 0.85,
-                isNegative: _isNegative(text),
-                isMoodPost: isMoodPost,
+                id: null, text, type: validType, x: xPct, y: yPct,
+                size: starSize, opacity: 0.85,
+                isNegative: _isNegative(text), isMoodPost,
                 createdAt: sentAt,
                 reactions: { listen: 0, hug: 0, strong: 0 },
                 nickname: STATE.user?.nickname || STATE.user?.username || '',
@@ -716,9 +682,7 @@ const Stars = (() => {
 
             el.style.opacity = '0';
             el.style.transition = 'opacity 0.6s ease';
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => { el.style.opacity = '1'; });
-            });
+            requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '1'; }));
 
             const id = await _postStar(text, validType, xPct, yPct, isMoodPost, sentAt);
             if (id) data.id = id;
@@ -737,8 +701,7 @@ const Stars = (() => {
                     'Authorization': `Bearer ${STATE.user?.token}`
                 },
                 body: JSON.stringify({
-                    text, type, x, y,
-                    isMoodPost,
+                    text, type, x, y, isMoodPost,
                     createdAt: createdAt || new Date().toISOString(),
                     nickname: STATE.user?.nickname || STATE.user?.username || 'Ẩn danh'
                 })
@@ -753,24 +716,40 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       SHOOTING STAR (mini game)
+       SHOOTING STAR — dùng setInterval thuần, không lồng setTimeout
        ================================================================ */
     function _isShootingStarDone() {
-        return !!(STATE.dailyMissions && STATE.dailyMissions['shooting_star_done']);
+        return !!(STATE.dailyMissions?.['shooting_star_done']);
     }
 
     function startShootingStarCycle() {
+        if (_shootingInterval) { clearInterval(_shootingInterval); _shootingInterval = null; }
         if (_isShootingStarDone()) return;
-        shootingTimer = setTimeout(() => {
-            _launchShootingStar();
-            shootingTimer = setInterval(() => {
-                if (!_isShootingStarDone()) _launchShootingStar();
+
+        // Bắn lần đầu sau 5s, sau đó mỗi 60s
+        let firstShot = setTimeout(() => {
+            if (!_isShootingStarDone()) _launchShootingStar();
+            _shootingInterval = setInterval(() => {
+                if (_isShootingStarDone()) {
+                    clearInterval(_shootingInterval);
+                    _shootingInterval = null;
+                } else {
+                    _launchShootingStar();
+                }
             }, 60000);
         }, 5000);
+
+        // Cleanup nếu done trước khi firstShot
+        const _checkDone = setInterval(() => {
+            if (_isShootingStarDone()) {
+                clearTimeout(firstShot);
+                clearInterval(_checkDone);
+            }
+        }, 1000);
     }
 
     function _launchShootingStar() {
-        if (shootingActive || _isShootingStarDone()) return;
+        if (shootingActive) return;
         shootingActive = true;
 
         const screen = document.getElementById('main-screen');
@@ -783,11 +762,9 @@ const Stars = (() => {
         wrapper.className = 'shooting-star-wrapper';
         wrapper.style.cssText = `
             position: fixed;
-            top: ${startTop}vh;
-            left: ${startLeft}vw;
+            top: ${startTop}vh; left: ${startLeft}vw;
             width: 0; height: 0;
-            pointer-events: none;
-            z-index: 500;
+            pointer-events: none; z-index: 500;
             animation: shootingMeteor ${METEOR_DURATION}ms cubic-bezier(0.18, 0.05, 0.42, 1) forwards;
         `;
 
@@ -814,8 +791,7 @@ const Stars = (() => {
             caught = true;
             shootingActive = false;
 
-            const computed = window.getComputedStyle(wrapper);
-            const matrix = new DOMMatrix(computed.transform);
+            const matrix = new DOMMatrix(window.getComputedStyle(wrapper).transform);
             wrapper.style.animation = 'none';
             wrapper.style.transform = `translate(${matrix.m41}px, ${matrix.m42}px) rotate(-35deg)`;
 
@@ -837,7 +813,7 @@ const Stars = (() => {
 
         setTimeout(() => {
             if (!caught) {
-                if (wrapper.parentNode) wrapper.remove();
+                wrapper.remove();
                 if (hint) hint.classList.add('hidden');
                 shootingActive = false;
             }
@@ -876,7 +852,9 @@ const Stars = (() => {
 
     /* ---- METEOR RAIN ---- */
     function startMeteorRain() {
-        meteorTimer = setInterval(_meteorRain, CONFIG.METEOR_RAIN_INTERVAL + 60000);
+        if (_meteorInterval) clearInterval(_meteorInterval);
+        // Offset khác shooting star để không trùng
+        _meteorInterval = setInterval(_meteorRain, CONFIG.METEOR_RAIN_INTERVAL + 60000);
     }
 
     async function _meteorRain() {
@@ -888,13 +866,14 @@ const Stars = (() => {
 
         const screen = document.getElementById('main-screen');
         if (!screen) return;
+
         for (let i = 0; i < 12; i++) {
             setTimeout(() => {
                 const m = document.createElement('div');
                 m.className = 'meteor-line';
                 m.style.cssText = `left:${10 + Math.random() * 80}vw; top:${Math.random() * 40}vh;`;
                 screen.appendChild(m);
-                setTimeout(() => { if (m.parentNode) m.remove(); }, 1400);
+                setTimeout(() => m.remove(), 1400);
             }, i * 120);
         }
     }
@@ -920,6 +899,6 @@ const Stars = (() => {
     return {
         loadStars, sendSignal, startShootingStarCycle,
         startMeteorRain, initPopupClose,
-        _clearDomStars: () => { domStars = []; }  // ← thêm dòng này
+        _clearDomStars: () => { domStars = []; }
     };
 })();
