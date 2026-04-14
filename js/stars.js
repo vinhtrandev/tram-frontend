@@ -1,15 +1,13 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - stars.js  [OPTIMISED]
+   TRẠM GỬI TÍN HIỆU - stars.js  [OPTIMISED + POLLING v3]
+   + Realtime polling: tự động hiện sao người khác gửi
    + Hiện tên mình / Ẩn danh cho người khác
    + Lưu createdAt đúng lúc gửi → hiện giờ gửi
-
-   Fixes:
-   - startShootingStarCycle: bỏ setTimeout lồng setInterval
-     → dùng setInterval thuần, clear đúng cách
-   - Fly canvas: tạo 1 lần, reuse, không leak
-   - _showLabel throttle: dùng requestAnimationFrame
-   - _meteorRain: không tạo canvas mới, dùng DOM div
-   - domStars cleanup đúng khi remove
+   + v2: Hiệu ứng star-new (< 30s) — ripple, pulse, badge vàng
+   + v3: Fly animation cho sao polling + nổi bật hơn
+   + v4: Lọc toxic / crisis keywords
+   + v5: Fix toxic block hoàn chỉnh — null-safe guards,
+         TOXIC_PHRASES support, return false khi bị chặn
    ================================================ */
 
 const Stars = (() => {
@@ -19,16 +17,48 @@ const Stars = (() => {
     let shootingActive = false;
     let _shootingInterval = null;
     let _meteorInterval = null;
+    let _pollingInterval = null;
 
     const METEOR_DURATION = 8000;
+    const NEW_STAR_MS = 30_000;
 
-    /* ---- NEGATIVE KEYWORD CHECK ---- */
+    /* ================================================================
+       KEYWORD CHECKS
+       ================================================================ */
+
     function _isNegative(text) {
+        if (!CONFIG.NEGATIVE_KEYWORDS?.length) return false;
         const lower = text.toLowerCase();
         return CONFIG.NEGATIVE_KEYWORDS.some(k => lower.includes(k));
     }
 
-    /* ---- SYNC ĐIỂM TỪ SERVER ---- */
+    function _isCrisis(text) {
+        if (!CONFIG.CRISIS_KEYWORDS?.length) return false;
+        const lower = text.toLowerCase();
+        return CONFIG.CRISIS_KEYWORDS.some(k => lower.includes(k));
+    }
+
+    function _isToxic(text) {
+        if (!text) return false;
+        const lower = text.toLowerCase();
+
+        // Check từ đơn tuyệt đối
+        if (CONFIG.TOXIC_KEYWORDS?.length) {
+            if (CONFIG.TOXIC_KEYWORDS.some(k => lower.includes(k))) return true;
+        }
+
+        // Check cụm từ (tránh chặn sai 'mày'/'tao' đứng một mình)
+        if (CONFIG.TOXIC_PHRASES?.length) {
+            if (CONFIG.TOXIC_PHRASES.some(p => lower.includes(p))) return true;
+        }
+
+        return false;
+    }
+
+    /* ================================================================
+       SYNC / PUSH POINTS
+       ================================================================ */
+
     async function _syncPointsFromServer() {
         if (!STATE.user?.token || STATE.user.token === 'local') return;
         try {
@@ -43,7 +73,6 @@ const Stars = (() => {
         } catch { }
     }
 
-    /* ---- GỬI ĐIỂM LÊN SERVER ---- */
     async function _pushPointsToServer(amount) {
         if (!STATE.user?.token || STATE.user.token === 'local') return;
         try {
@@ -74,6 +103,7 @@ const Stars = (() => {
 
         const el = document.createElement('div');
         el.className = `star-dot type-${data.type}`;
+        if (data.isOwn) el.classList.add('star-own');
 
         if (data.type === 'north') {
             const s = data.size || 7;
@@ -132,6 +162,22 @@ const Stars = (() => {
 
         if (data.isNegative) el.classList.add('has-react');
 
+        // ── HIỆU ỨNG SAO MỚI (< 30 giây) ──────────────────────────────
+        const ageMs = data.createdAt
+            ? Date.now() - new Date(data.createdAt).getTime()
+            : NEW_STAR_MS + 1;
+
+        if (ageMs < NEW_STAR_MS) {
+            const remaining = NEW_STAR_MS - ageMs;
+            el.classList.add('star-new');
+            if (ageMs < 5000) {
+                el.classList.add('star-badge');
+                setTimeout(() => el.classList.remove('star-badge'), 5000 - ageMs);
+            }
+            setTimeout(() => el.classList.remove('star-new'), remaining);
+        }
+        // ────────────────────────────────────────────────────────────────
+
         const badge = document.createElement('div');
         badge.className = 'star-react-badge';
         badge.style.display = 'none';
@@ -147,7 +193,6 @@ const Stars = (() => {
         data._badge = badge;
         data._el = el;
 
-        // TTL auto-remove
         const typeConf = CONFIG.STAR_TYPES[data.type];
         if (typeConf?.ttl && !typeConf.permanent) {
             setTimeout(() => {
@@ -164,7 +209,9 @@ const Stars = (() => {
         return wrapper;
     }
 
-    /* ---- REACT BADGE ---- */
+    /* ================================================================
+       REACT BADGE
+       ================================================================ */
     function _formatReactBadge(data) {
         const r = data.reactions || {};
         const parts = [];
@@ -185,7 +232,9 @@ const Stars = (() => {
         }
     }
 
-    /* ---- LABEL (throttle RAF) ---- */
+    /* ================================================================
+       LABEL
+       ================================================================ */
     let labelEl = null;
     let _labelRaf = null;
     let _labelTarget = null;
@@ -224,7 +273,9 @@ const Stars = (() => {
         if (labelEl) { labelEl.remove(); labelEl = null; }
     }
 
-    /* ---- FORMAT THỜI GIAN ---- */
+    /* ================================================================
+       FORMAT THỜI GIAN
+       ================================================================ */
     function _formatTime(isoString) {
         if (!isoString) return null;
         const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
@@ -384,7 +435,6 @@ const Stars = (() => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const list = await res.json();
 
-            // Dọn DOM cũ
             domStars.forEach(s => { if (s.el?.parentNode) s.el.remove(); });
             domStars = [];
 
@@ -405,6 +455,99 @@ const Stars = (() => {
         }
     }
 
+    /* ================================================================
+       POLLING REALTIME
+       ================================================================ */
+    function startPolling(intervalMs = 15000) {
+        if (_pollingInterval) clearInterval(_pollingInterval);
+
+        _pollingInterval = setInterval(async () => {
+            if (!STATE.user?.token || STATE.user.token === 'local') return;
+            if (document.hidden) return;
+
+            try {
+                const res = await fetch(`${CONFIG.API_BASE}/stars`, {
+                    headers: { 'Authorization': `Bearer ${STATE.user.token}` }
+                });
+                if (!res.ok) return;
+                const list = await res.json();
+
+                let newFromOthers = 0;
+                const myId = STATE.user?.id;
+
+                list.forEach(s => {
+                    const exists = domStars.find(d => d.data.id && s.id && String(d.data.id) === String(s.id));
+                    if (exists) return;
+
+                    if (s.x == null) s.x = 5 + Math.random() * 88;
+                    if (s.y == null) s.y = 5 + Math.random() * 70;
+                    if (!s.size) s.size = 3 + Math.random() * 5;
+                    if (!s.opacity) s.opacity = 0.5 + Math.random() * 0.5;
+                    if (!CONFIG.STAR_TYPES[s.type]) s.type = 'shooting';
+                    s.reactions = { listen: s.listenCount || 0, hug: s.hugCount || 0, strong: s.strongCount || 0 };
+                    s.isMoodPost = s.isMoodPost || false;
+
+                    // Giữ slot ngay để polling sau không tạo trùng
+                    domStars.push({ el: null, data: s });
+                    const entry = domStars[domStars.length - 1];
+
+                    // Tính tọa độ đích thực tế (px)
+                    const mainScreen = document.getElementById('main-screen');
+                    const mainRect = mainScreen?.getBoundingClientRect() || { left: 0, top: 0 };
+                    const screenW = mainScreen?.offsetWidth || window.innerWidth;
+                    const screenH = mainScreen?.offsetHeight || window.innerHeight;
+                    const destX = mainRect.left + (s.x / 100) * screenW;
+                    const destY = mainRect.top + (s.y / 100) * screenH;
+
+                    // Điểm xuất phát — rìa màn hình ngẫu nhiên
+                    const W2 = window.innerWidth, H2 = window.innerHeight;
+                    const edge = Math.floor(Math.random() * 4);
+                    const startX = edge === 0 ? Math.random() * W2
+                        : edge === 1 ? W2
+                            : edge === 2 ? Math.random() * W2
+                                : 0;
+                    const startY = edge === 0 ? 0
+                        : edge === 1 ? Math.random() * H2
+                            : edge === 2 ? H2
+                                : Math.random() * H2;
+
+                    const flyFn = s.type === 'north' ? _flyNorthStar
+                        : s.type === 'cluster' ? _flyClusterStar
+                            : _flyShootingStar;
+
+                    flyFn(startX, startY, destX, destY, () => {
+                        const el = _createDomStar(s);
+                        entry.el = el;
+                        el.style.opacity = '0';
+                        el.style.transition = 'opacity 0.5s ease';
+                        requestAnimationFrame(() => requestAnimationFrame(() => {
+                            el.style.opacity = '1';
+                        }));
+                    });
+
+                    if (s.userId && String(s.userId) !== String(myId)) {
+                        newFromOthers++;
+                    }
+                });
+
+                if (newFromOthers > 0) {
+                    UI.showToast(`✨ ${newFromOthers} tín hiệu mới vừa đến vũ trụ`, 3000);
+                }
+
+            } catch { /* offline */ }
+        }, intervalMs);
+    }
+
+    function stopPolling() {
+        if (_pollingInterval) {
+            clearInterval(_pollingInterval);
+            _pollingInterval = null;
+        }
+    }
+
+    /* ================================================================
+       DEMO STARS (fallback offline)
+       ================================================================ */
     function _addDemoStars() {
         domStars.forEach(s => { if (s.el?.parentNode) s.el.remove(); });
         domStars = [];
@@ -419,19 +562,17 @@ const Stars = (() => {
             { id: 8, text: 'Không biết tương lai sẽ như thế nào...', type: 'cluster', isNegative: true, isMoodPost: true, reactions: { listen: 1, hug: 0, strong: 0 }, createdAt: new Date(Date.now() - 120000).toISOString() },
             { id: 9, text: 'Vừa ăn bát bún bò ngon nhất đời 😋', type: 'north', isNegative: false, isMoodPost: false, reactions: {}, createdAt: new Date(Date.now() - 300000).toISOString() },
             { id: 10, text: 'Gửi đến những ai đang cô đơn: bạn không một mình đâu 💙', type: 'north', isNegative: false, isMoodPost: false, reactions: { listen: 3, hug: 12, strong: 0 }, createdAt: new Date(Date.now() - 172800000).toISOString() },
+            { id: 99, text: 'Tín hiệu vừa gửi lên vũ trụ... 🌟', type: 'shooting', isNegative: false, isMoodPost: false, reactions: {}, createdAt: new Date(Date.now() - 3000).toISOString() },
         ];
         demos.forEach(d => {
-            const s = {
-                ...d, x: 5 + Math.random() * 88, y: 5 + Math.random() * 65,
-                size: 3 + Math.random() * 5, opacity: 0.6 + Math.random() * 0.4
-            };
+            const s = { ...d, x: 5 + Math.random() * 88, y: 5 + Math.random() * 65, size: 3 + Math.random() * 5, opacity: 0.6 + Math.random() * 0.4 };
             const el = _createDomStar(s);
             domStars.push({ el, data: s });
         });
     }
 
     /* ================================================================
-       FLY ANIMATIONS — dùng 1 canvas cố định, không tạo mới mỗi lần
+       FLY ANIMATIONS — v3
        ================================================================ */
     let _flyCanvas = null;
     let _flyCtx = null;
@@ -454,11 +595,63 @@ const Stars = (() => {
         return { cv: _flyCanvas, ctx: _flyCtx, W, H };
     }
 
+    /* Shockwave tại điểm đích */
+    function _shockwave(ctx, W, H, tx, ty, color1, color2) {
+        let r = 0, alpha = 1;
+        (function ring() {
+            ctx.clearRect(0, 0, W, H);
+            r += 6;
+            alpha -= 0.045;
+            if (alpha <= 0) { ctx.clearRect(0, 0, W, H); return; }
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = color1;
+            ctx.lineWidth = 3 - r * 0.02;
+            ctx.beginPath(); ctx.arc(tx, ty, r, 0, Math.PI * 2); ctx.stroke();
+            if (r > 15) {
+                ctx.strokeStyle = color2;
+                ctx.lineWidth = 1.5;
+                ctx.globalAlpha = alpha * 0.5;
+                ctx.beginPath(); ctx.arc(tx, ty, r * 0.6, 0, Math.PI * 2); ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            requestAnimationFrame(ring);
+        })();
+    }
+
+    /* Spark tóe ra tại điểm đích */
+    function _sparks(tx, ty, color, count = 14) {
+        for (let i = 0; i < count; i++) {
+            const el = document.createElement('div');
+            const angle = (i / count) * Math.PI * 2;
+            const speed = 40 + Math.random() * 60;
+            const size = 2 + Math.random() * 3;
+            el.style.cssText = `
+                position: fixed;
+                left: ${tx}px; top: ${ty}px;
+                width: ${size}px; height: ${size}px;
+                border-radius: 50%;
+                background: ${color};
+                pointer-events: none;
+                z-index: 600;
+                box-shadow: 0 0 ${size * 2}px ${color};
+                transition: transform 0.6s cubic-bezier(0.2,0,0.8,1), opacity 0.6s ease;
+                transform: translate(-50%,-50%);
+                opacity: 1;
+            `;
+            document.body.appendChild(el);
+            requestAnimationFrame(() => requestAnimationFrame(() => {
+                el.style.transform = `translate(calc(-50% + ${Math.cos(angle) * speed}px), calc(-50% + ${Math.sin(angle) * speed}px))`;
+                el.style.opacity = '0';
+            }));
+            setTimeout(() => el.remove(), 700);
+        }
+    }
+
     function _flyShootingStar(sx, sy, tx, ty, onDone) {
         const { ctx, W, H } = _getFlyCanvas();
         const dx = tx - sx, dy = ty - sy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const steps = Math.ceil(dist / 3.8);
+        const steps = Math.ceil(dist / 5);
         let step = 0;
         const trail = [];
 
@@ -468,40 +661,47 @@ const Stars = (() => {
             const x = sx + dx * progress, y = sy + dy * progress;
 
             trail.push({ x, y });
-            if (trail.length > 28) trail.shift();
+            if (trail.length > 50) trail.shift();
 
             trail.forEach((pt, i) => {
-                ctx.fillStyle = `rgba(168,216,255,${(i / trail.length) * 0.65})`;
-                ctx.beginPath(); ctx.arc(pt.x, pt.y, 1.8, 0, Math.PI * 2); ctx.fill();
+                const t = i / trail.length;
+                ctx.globalAlpha = t * 0.8;
+                ctx.fillStyle = 'rgba(180,225,255,1)';
+                ctx.beginPath(); ctx.arc(pt.x, pt.y, 1 + t * 3.5, 0, Math.PI * 2); ctx.fill();
             });
+            ctx.globalAlpha = 1;
 
-            for (let k = 0; k < 3; k++) {
-                ctx.fillStyle = 'rgba(168,216,255,0.4)';
+            for (let k = 0; k < 5; k++) {
+                const t = Math.random();
+                ctx.globalAlpha = Math.random() * 0.5;
+                ctx.fillStyle = '#c8eeff';
                 ctx.beginPath();
-                ctx.arc(x + (Math.random() - 0.5) * 12, y + (Math.random() - 0.5) * 8,
-                    Math.random() * 1.5, 0, Math.PI * 2);
+                ctx.arc(
+                    sx + dx * t * progress + (Math.random() - 0.5) * 14,
+                    sy + dy * t * progress + (Math.random() - 0.5) * 10,
+                    Math.random() * 2, 0, Math.PI * 2
+                );
                 ctx.fill();
             }
+            ctx.globalAlpha = 1;
 
-            const rg = ctx.createRadialGradient(x, y, 0, x, y, 9);
-            rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.5, '#a8d8ff'); rg.addColorStop(1, 'rgba(168,216,255,0)');
-            ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fill();
+            const headGlow = ctx.createRadialGradient(x, y, 0, x, y, 28);
+            headGlow.addColorStop(0, '#ffffff');
+            headGlow.addColorStop(0.25, '#a8d8ff');
+            headGlow.addColorStop(0.6, 'rgba(100,180,255,0.4)');
+            headGlow.addColorStop(1, 'rgba(100,180,255,0)');
+            ctx.fillStyle = headGlow;
+            ctx.beginPath(); ctx.arc(x, y, 28, 0, Math.PI * 2); ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
 
             step++;
             if (step <= steps) { requestAnimationFrame(frame); return; }
 
-            let alpha = 1;
-            (function fade() {
-                ctx.clearRect(0, 0, W, H);
-                alpha -= 0.08;
-                ctx.globalAlpha = Math.max(0, alpha);
-                const rg2 = ctx.createRadialGradient(tx, ty, 0, tx, ty, 14);
-                rg2.addColorStop(0, '#fff'); rg2.addColorStop(1, 'rgba(168,216,255,0)');
-                ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(tx, ty, 14, 0, Math.PI * 2); ctx.fill();
-                ctx.globalAlpha = 1;
-                if (alpha > 0) requestAnimationFrame(fade);
-                else { ctx.clearRect(0, 0, W, H); onDone?.(); }
-            })();
+            _sparks(tx, ty, '#a8d8ff', 16);
+            _shockwave(ctx, W, H, tx, ty, 'rgba(168,216,255,0.9)', 'rgba(255,255,255,0.6)');
+            setTimeout(() => { ctx.clearRect(0, 0, W, H); onDone?.(); }, 700);
         }
         requestAnimationFrame(frame);
     }
@@ -510,22 +710,27 @@ const Stars = (() => {
         const { ctx, W, H } = _getFlyCanvas();
         const dx = tx - sx, dy = ty - sy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const steps = Math.ceil(dist / 1.1);
+        const steps = Math.ceil(dist / 3.5);
         let step = 0, t = 0;
 
         function frame() {
             ctx.clearRect(0, 0, W, H);
             const progress = step / steps;
             const x = sx + dx * progress, y = sy + dy * progress;
-            const pulse = 1 + 0.12 * Math.sin(t * 0.08);
+            const pulse = 1 + 0.18 * Math.sin(t * 0.12);
             t++;
 
-            const og = ctx.createRadialGradient(x, y, 0, x, y, 22 * pulse);
-            og.addColorStop(0, 'rgba(255,248,194,0.5)'); og.addColorStop(1, 'rgba(255,248,194,0)');
-            ctx.fillStyle = og; ctx.beginPath(); ctx.arc(x, y, 22 * pulse, 0, Math.PI * 2); ctx.fill();
+            const aura = ctx.createRadialGradient(x, y, 0, x, y, 42 * pulse);
+            aura.addColorStop(0, 'rgba(255,248,194,0.65)');
+            aura.addColorStop(0.5, 'rgba(255,220,100,0.2)');
+            aura.addColorStop(1, 'rgba(255,248,194,0)');
+            ctx.fillStyle = aura;
+            ctx.beginPath(); ctx.arc(x, y, 42 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            const r1 = 11 * pulse, r2 = 3.5;
+            const r1 = 18 * pulse, r2 = 5;
             ctx.fillStyle = '#fff8c2';
+            ctx.shadowColor = '#ffe066';
+            ctx.shadowBlur = 18;
             ctx.beginPath();
             for (let i = 0; i < 4; i++) {
                 const a = (i * Math.PI / 2) - Math.PI / 2;
@@ -535,23 +740,24 @@ const Stars = (() => {
                 ctx.lineTo(x + r2 * Math.cos(a2), y + r2 * Math.sin(a2));
             }
             ctx.closePath(); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            ctx.strokeStyle = 'rgba(255,248,194,0.35)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 4; i++) {
+                const a = (i * Math.PI / 2);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + Math.cos(a) * r1 * 1.6, y + Math.sin(a) * r1 * 1.6);
+                ctx.stroke();
+            }
 
             step++;
             if (step <= steps) { requestAnimationFrame(frame); return; }
 
-            let alpha = 1.2;
-            (function burst() {
-                ctx.clearRect(0, 0, W, H);
-                alpha -= 0.055;
-                if (alpha <= 0) { ctx.clearRect(0, 0, W, H); onDone?.(); return; }
-                ctx.globalAlpha = Math.min(1, alpha);
-                const spread = (1.2 - alpha) * 28;
-                const gr = ctx.createRadialGradient(tx, ty, 0, tx, ty, spread);
-                gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.4, 'rgba(255,248,194,0.7)'); gr.addColorStop(1, 'rgba(255,248,194,0)');
-                ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(tx, ty, spread, 0, Math.PI * 2); ctx.fill();
-                ctx.globalAlpha = 1;
-                requestAnimationFrame(burst);
-            })();
+            _sparks(tx, ty, '#ffe066', 20);
+            _shockwave(ctx, W, H, tx, ty, 'rgba(255,220,80,0.95)', 'rgba(255,255,200,0.5)');
+            setTimeout(() => { ctx.clearRect(0, 0, W, H); onDone?.(); }, 700);
         }
         requestAnimationFrame(frame);
     }
@@ -560,65 +766,55 @@ const Stars = (() => {
         const { ctx, W, H } = _getFlyCanvas();
         const dx = tx - sx, dy = ty - sy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const steps = Math.ceil(dist / 2.2);
+        const steps = Math.ceil(dist / 4);
         let step = 0;
 
-        const OFFSETS = [0, -22, -44];
-        const SIZES = [6, 4.5, 3.5];
-        const ALPHAS = [0.95, 0.7, 0.5];
+        const baseAngle = Math.atan2(dy, dx);
+        const FAN = [
+            { offAngle: -0.18, lag: 0, size: 8, alpha: 1.0 },
+            { offAngle: 0, lag: 8, size: 6, alpha: 0.85 },
+            { offAngle: 0.18, lag: 16, size: 5, alpha: 0.65 },
+        ];
 
         function frame() {
             ctx.clearRect(0, 0, W, H);
-            const progress = step / steps;
-            const baseX = sx + dx * progress, baseY = sy + dy * progress;
-            const len = dist || 1;
-            const ux = dx / len, uy = dy / len;
 
-            OFFSETS.forEach((off, i) => {
-                const px = baseX + ux * off, py = baseY + uy * off;
-                const r = SIZES[i], alpha = ALPHAS[i];
+            FAN.forEach(({ offAngle, lag, size, alpha }) => {
+                const s = Math.max(0, step - lag);
+                const progress = Math.min(s / steps, 1);
+                const angle = baseAngle + offAngle;
+                const px = sx + Math.cos(angle) * dist * progress;
+                const py = sy + Math.sin(angle) * dist * progress;
 
-                const rg = ctx.createRadialGradient(px, py, 0, px, py, r * 2.8);
-                rg.addColorStop(0, `rgba(212,184,255,${alpha})`); rg.addColorStop(1, 'rgba(156,125,255,0)');
-                ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(px, py, r * 2.8, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = `rgba(212,184,255,${alpha})`;
-                ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+                const rg = ctx.createRadialGradient(px, py, 0, px, py, size * 4);
+                rg.addColorStop(0, `rgba(212,184,255,${alpha})`);
+                rg.addColorStop(1, 'rgba(156,125,255,0)');
+                ctx.fillStyle = rg;
+                ctx.beginPath(); ctx.arc(px, py, size * 4, 0, Math.PI * 2); ctx.fill();
 
-                for (let k = 0; k < 3; k++) {
-                    const angle = (k / 3) * Math.PI * 2 + step * 0.04;
-                    ctx.fillStyle = `rgba(212,184,255,${alpha * 0.45})`;
-                    ctx.beginPath();
-                    ctx.arc(px + r * 1.8 * Math.cos(angle), py + r * 1.8 * Math.sin(angle),
-                        r * 0.35, 0, Math.PI * 2);
-                    ctx.fill();
+                ctx.fillStyle = `rgba(230,210,255,${alpha})`;
+                ctx.shadowColor = '#d4b8ff';
+                ctx.shadowBlur = 10;
+                ctx.beginPath(); ctx.arc(px, py, size, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+
+                for (let k = 1; k <= 4; k++) {
+                    const tp = Math.max(0, (s - k * 3) / steps);
+                    const tx2 = sx + Math.cos(angle) * dist * tp;
+                    const ty2 = sy + Math.sin(angle) * dist * tp;
+                    ctx.globalAlpha = alpha * (1 - k / 5) * 0.6;
+                    ctx.fillStyle = '#c8a8ff';
+                    ctx.beginPath(); ctx.arc(tx2, ty2, size * (1 - k * 0.18), 0, Math.PI * 2); ctx.fill();
                 }
+                ctx.globalAlpha = 1;
             });
 
-            ctx.strokeStyle = 'rgba(156,125,255,0.25)';
-            ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
-            ctx.beginPath();
-            ctx.moveTo(baseX, baseY);
-            ctx.lineTo(baseX + ux * OFFSETS[2], baseY + uy * OFFSETS[2]);
-            ctx.stroke(); ctx.setLineDash([]);
-
             step++;
-            if (step <= steps) { requestAnimationFrame(frame); return; }
+            if (step <= steps + 16) { requestAnimationFrame(frame); return; }
 
-            let alpha2 = 1;
-            (function disperse() {
-                ctx.clearRect(0, 0, W, H);
-                alpha2 -= 0.065;
-                if (alpha2 <= 0) { ctx.clearRect(0, 0, W, H); onDone?.(); return; }
-                ctx.globalAlpha = alpha2;
-                const spread = (1 - alpha2) * 20;
-                [[0, -spread], [-spread, spread * 0.8], [spread, spread * 0.8]].forEach(([ox, oy]) => {
-                    const rg2 = ctx.createRadialGradient(tx + ox, ty + oy, 0, tx + ox, ty + oy, 10);
-                    rg2.addColorStop(0, 'rgba(212,184,255,0.8)'); rg2.addColorStop(1, 'rgba(156,125,255,0)');
-                    ctx.fillStyle = rg2; ctx.beginPath(); ctx.arc(tx + ox, ty + oy, 10, 0, Math.PI * 2); ctx.fill();
-                });
-                ctx.globalAlpha = 1;
-                requestAnimationFrame(disperse);
-            })();
+            _sparks(tx, ty, '#d4b8ff', 18);
+            _shockwave(ctx, W, H, tx, ty, 'rgba(200,160,255,0.9)', 'rgba(180,130,255,0.5)');
+            setTimeout(() => { ctx.clearRect(0, 0, W, H); onDone?.(); }, 700);
         }
         requestAnimationFrame(frame);
     }
@@ -627,8 +823,20 @@ const Stars = (() => {
        SEND SIGNAL
        ================================================================ */
     async function sendSignal(text, type, showHeal = true, isMoodPost = false) {
-        if (!text?.trim()) return;
+        if (!text?.trim()) return false;
 
+        // ── CHẶN TOXIC — dừng hoàn toàn, không bay, không cộng điểm ──
+        if (_isToxic(text)) {
+            UI.showToast('💫 Trạm là không gian bình yên — hãy gửi điều nhẹ nhàng hơn nhé', 4000);
+            return false;
+        }
+
+        // ── CẢNH BÁO CRISIS — vẫn cho gửi, chỉ hiện hotline ──
+        if (_isCrisis(text)) {
+            UI.showToast('💙 Bạn không đơn độc. Đường dây hỗ trợ miễn phí: 1800 599 920', 7000);
+        }
+
+        // ── TỪ ĐÂY XUỐNG: CHỈ CHẠY KHI TEXT HỢP LỆ ──
         if (typeof Sound !== 'undefined') Sound.playBell();
         if (showHeal && typeof HealToast !== 'undefined') HealToast.show();
 
@@ -653,7 +861,8 @@ const Stars = (() => {
         const yPct = ((flyTargetY - mainRect.top) / screenH) * 100;
 
         const sizeRange = CONFIG.STAR_TYPES[validType].size;
-        const starSize = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
+        const baseSize = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
+        const starSize = baseSize * 2.2;
 
         const sendBtn = document.getElementById('btn-send');
         const btnRect = sendBtn?.getBoundingClientRect();
@@ -666,15 +875,17 @@ const Stars = (() => {
 
         const sentAt = new Date().toISOString();
 
+        // SAO CHỈ BAY → TẠO → POST → CỘNG ĐIỂM SAU KHI FLY XONG
         flyFn(startX, startY, flyTargetX, flyTargetY, async () => {
             const data = {
                 id: null, text, type: validType, x: xPct, y: yPct,
-                size: starSize, opacity: 0.85,
+                size: starSize, opacity: 0.95,
                 isNegative: _isNegative(text), isMoodPost,
                 createdAt: sentAt,
                 reactions: { listen: 0, hug: 0, strong: 0 },
                 nickname: STATE.user?.nickname || STATE.user?.username || '',
-                userId: STATE.user?.id || null
+                userId: STATE.user?.id || null,
+                isOwn: true
             };
 
             const el = _createDomStar(data);
@@ -690,6 +901,8 @@ const Stars = (() => {
             await _syncPointsFromServer();
             UI.updateHUD();
         });
+
+        return true;
     }
 
     async function _postStar(text, type, x, y, isMoodPost = false, createdAt = null) {
@@ -716,7 +929,7 @@ const Stars = (() => {
     }
 
     /* ================================================================
-       SHOOTING STAR — dùng setInterval thuần, không lồng setTimeout
+       SHOOTING STAR
        ================================================================ */
     function _isShootingStarDone() {
         return !!(STATE.dailyMissions?.['shooting_star_done']);
@@ -726,7 +939,6 @@ const Stars = (() => {
         if (_shootingInterval) { clearInterval(_shootingInterval); _shootingInterval = null; }
         if (_isShootingStarDone()) return;
 
-        // Bắn lần đầu sau 5s, sau đó mỗi 60s
         let firstShot = setTimeout(() => {
             if (!_isShootingStarDone()) _launchShootingStar();
             _shootingInterval = setInterval(() => {
@@ -739,7 +951,6 @@ const Stars = (() => {
             }, 60000);
         }, 5000);
 
-        // Cleanup nếu done trước khi firstShot
         const _checkDone = setInterval(() => {
             if (_isShootingStarDone()) {
                 clearTimeout(firstShot);
@@ -850,10 +1061,11 @@ const Stars = (() => {
         }
     }
 
-    /* ---- METEOR RAIN ---- */
+    /* ================================================================
+       METEOR RAIN
+       ================================================================ */
     function startMeteorRain() {
         if (_meteorInterval) clearInterval(_meteorInterval);
-        // Offset khác shooting star để không trùng
         _meteorInterval = setInterval(_meteorRain, CONFIG.METEOR_RAIN_INTERVAL + 60000);
     }
 
@@ -878,7 +1090,9 @@ const Stars = (() => {
         }
     }
 
-    /* ---- CLOSE POPUP ---- */
+    /* ================================================================
+       CLOSE POPUP
+       ================================================================ */
     function initPopupClose() {
         const closeBtn = document.getElementById('popup-close');
         const canvas = document.getElementById('star-canvas');
@@ -896,9 +1110,18 @@ const Stars = (() => {
         }
     }
 
+    /* ================================================================
+       PUBLIC API
+       ================================================================ */
     return {
-        loadStars, sendSignal, startShootingStarCycle,
-        startMeteorRain, initPopupClose,
+        loadStars,
+        sendSignal,
+        startShootingStarCycle,
+        startMeteorRain,
+        initPopupClose,
+        startPolling,
+        stopPolling,
         _clearDomStars: () => { domStars = []; }
     };
+
 })();

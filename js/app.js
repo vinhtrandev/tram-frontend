@@ -1,20 +1,11 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - app.js  [OPTIMISED]
+   TRẠM GỬI TÍN HIỆU - app.js  [OPTIMISED + POLLING]
    Main orchestrator: boot sequence, screen flow
-   + NotifSystem hooks cho tất cả sự kiện điểm
-   + Star type preview popup + bounce animation
-
-   Fixes:
-   - _animateNorthIcon chỉ chạy khi nút visible
-     (dùng IntersectionObserver + pause/resume)
-   - _animateNorthIconLarge chỉ chạy khi preview .show
-   - Canvas.stopLanding() khi transition sang main
-   - Dọn RAF khi không cần
+   + Realtime polling sao mới từ người khác
    ================================================ */
 
 const App = (() => {
 
-    /* ── RAF handles cho north star icons ── */
     let _northSmallRaf = null;
     let _northLargeRaf = null;
     let _northSmallPaused = false;
@@ -59,7 +50,6 @@ const App = (() => {
 
         await _sleep(800);
 
-        // ── Dừng landing canvas RAF ──
         Canvas.stopLanding();
 
         landing.classList.remove('active');
@@ -95,10 +85,13 @@ const App = (() => {
         _hookVoid();
         _hookMeteorRain();
 
-        Stars.loadStars();
+        await Stars.loadStars();
         Stars.initPopupClose();
         Stars.startShootingStarCycle();
         Stars.startMeteorRain();
+
+        // ── Bắt đầu polling realtime sao mới ──
+        Stars.startPolling(15000); // poll mỗi 15 giây
 
         Sound.initButtons();
 
@@ -205,7 +198,6 @@ const App = (() => {
 
         container.innerHTML = '';
 
-        // Dừng RAF cũ nếu re-init
         if (_northSmallRaf) { cancelAnimationFrame(_northSmallRaf); _northSmallRaf = null; }
         if (_northLargeRaf) { cancelAnimationFrame(_northLargeRaf); _northLargeRaf = null; }
 
@@ -242,13 +234,11 @@ const App = (() => {
                 padding: 0;
             `;
 
-            // Icon canvas nhỏ
             const cv = document.createElement('canvas');
             cv.width = 56; cv.height = 56;
             cv.style.cssText = 'width:28px;height:28px;pointer-events:none;display:block;';
             btn.appendChild(cv);
 
-            // Badge TTL
             const badge = document.createElement('span');
             badge.style.cssText = `
                 position:absolute; top:-4px; right:-4px;
@@ -265,7 +255,6 @@ const App = (() => {
                 : '∞';
             btn.appendChild(badge);
 
-            // Preview popup
             const preview = document.createElement('div');
             preview.className = 'star-type-preview';
 
@@ -294,7 +283,6 @@ const App = (() => {
 
             btn.addEventListener('click', () => _selectStarType(type.id));
 
-            // Hover: bắt đầu / dừng large anim
             btn.addEventListener('mouseenter', () => {
                 preview.classList.add('show');
                 if (type.id === 'north') {
@@ -307,7 +295,6 @@ const App = (() => {
                 if (type.id === 'north') _northLargePaused = true;
             });
 
-            // Touch mobile
             btn.addEventListener('touchstart', () => {
                 preview.classList.add('show');
                 if (type.id === 'north') {
@@ -322,23 +309,19 @@ const App = (() => {
 
             container.appendChild(btn);
 
-            // Vẽ icon tĩnh cho shooting + cluster
             if (type.id !== 'north') {
                 _drawStarIcon(cv.getContext('2d'), type.id);
                 _drawStarIconLarge(previewCv.getContext('2d'), type.id);
             } else {
-                // North: lưu ref canvas, animate nhỏ luôn (nhẹ), large chỉ khi hover
                 northSmallCv = cv;
                 northLargeCv = previewCv;
                 _animateNorthIcon(northSmallCv);
-                // Large: KHÔNG bắt đầu ngay — chờ hover
             }
         });
 
         _applyActiveStyle(STATE.activeStarType);
     }
 
-    /* ── Vẽ icon nhỏ (56×56) tĩnh ── */
     function _drawStarIcon(ctx, typeId) {
         const w = 56, cy = 28;
         ctx.clearRect(0, 0, w, w);
@@ -382,7 +365,6 @@ const App = (() => {
         }
     }
 
-    /* ── Vẽ icon lớn (96×96) tĩnh ── */
     function _drawStarIconLarge(ctx, typeId) {
         const w = 96, cy = 48;
         ctx.clearRect(0, 0, w, w);
@@ -434,14 +416,12 @@ const App = (() => {
         }
     }
 
-    /* ── Animate north icon nhỏ (luôn chạy, nhẹ) ── */
     function _animateNorthIcon(cv) {
         if (!cv) return;
         if (_northSmallRaf) cancelAnimationFrame(_northSmallRaf);
         let t = 0;
 
         function frame() {
-            // Pause nếu tab ẩn
             if (document.hidden) { _northSmallRaf = requestAnimationFrame(frame); return; }
 
             const ctx = cv.getContext('2d');
@@ -450,14 +430,12 @@ const App = (() => {
 
             const pulse = 1 + 0.1 * Math.sin(t * 0.05);
 
-            // Glow nhẹ — không dùng shadowBlur
             const og = ctx.createRadialGradient(cx, cy, 0, cx, cy, 13 * pulse);
             og.addColorStop(0, 'rgba(255,248,194,0.5)');
             og.addColorStop(1, 'rgba(255,248,194,0)');
             ctx.fillStyle = og;
             ctx.beginPath(); ctx.arc(cx, cy, 13 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            // 4-cánh star
             const r1 = 9 * pulse, r2 = 3;
             ctx.fillStyle = '#fff8c2';
             ctx.beginPath();
@@ -476,14 +454,12 @@ const App = (() => {
         frame();
     }
 
-    /* ── Animate north icon lớn (CHỈ khi preview hiện) ── */
     function _animateNorthIconLarge(cv) {
         if (!cv) return;
         if (_northLargeRaf) cancelAnimationFrame(_northLargeRaf);
         let t = 0;
 
         function frame() {
-            // Dừng nếu pause hoặc tab ẩn
             if (_northLargePaused || document.hidden) {
                 _northLargeRaf = null;
                 return;
@@ -495,7 +471,6 @@ const App = (() => {
 
             const pulse = 1 + 0.12 * Math.sin(t * 0.06);
 
-            // Outer glow — radial gradient thay shadowBlur
             const og = ctx.createRadialGradient(cx, cy, 0, cx, cy, 26 * pulse);
             og.addColorStop(0, 'rgba(255,248,194,0.4)');
             og.addColorStop(0.5, 'rgba(255,248,194,0.12)');
@@ -503,14 +478,12 @@ const App = (() => {
             ctx.fillStyle = og;
             ctx.beginPath(); ctx.arc(cx, cy, 26 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            // Inner corona
             const ic = ctx.createRadialGradient(cx, cy, 0, cx, cy, 13 * pulse);
             ic.addColorStop(0, 'rgba(255,255,220,0.65)');
             ic.addColorStop(1, 'rgba(255,248,194,0)');
             ctx.fillStyle = ic;
             ctx.beginPath(); ctx.arc(cx, cy, 13 * pulse, 0, Math.PI * 2); ctx.fill();
 
-            // 4-cánh star (không dùng shadowBlur)
             const r1 = 17 * pulse, r2 = 5;
             ctx.fillStyle = '#fff8c2';
             ctx.beginPath();
@@ -523,7 +496,6 @@ const App = (() => {
             }
             ctx.closePath(); ctx.fill();
 
-            // Sparkles xoay (chỉ 4 điểm nhỏ)
             for (let i = 0; i < 4; i++) {
                 const angle = (i / 4) * Math.PI * 2 + t * 0.016;
                 const dist = 21 * pulse;
@@ -540,7 +512,6 @@ const App = (() => {
         frame();
     }
 
-    /* ── Chọn loại sao ── */
     function _selectStarType(typeId) {
         STATE.activeStarType = typeId;
         _applyActiveStyle(typeId);
@@ -555,7 +526,6 @@ const App = (() => {
             const preview = btn.querySelector('.star-type-preview');
             if (preview) {
                 preview.classList.remove('show');
-                // Dừng large anim sau khi chọn
                 _northLargePaused = true;
             }
         }
@@ -576,7 +546,6 @@ const App = (() => {
         });
     }
 
-    /* ── Hooks ── */
     function _hookSendSignal() {
         const btn = document.getElementById('btn-send');
         if (!btn) return;

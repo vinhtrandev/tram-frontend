@@ -4,7 +4,7 @@
    ================================================ */
 
 const CONFIG = {
-    API_BASE: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    API_BASE: window.location.hostname === 'localhost'
         ? 'http://localhost:8080/api'
         : 'https://tram-backend.onrender.com/api',
 
@@ -102,9 +102,8 @@ const CONFIG = {
         'Hãy để bóng tối bao bọc lấy mệt mỏi của bạn, và để ánh sao dẫn lối cho trái tim.',
         'Hãy cứ tỏa sáng theo cách của riêng bạn, vũ trụ này cần ánh sáng đó.',
         'Một cái ôm từ xa gửi đến bạn. Mong bạn cảm nhận được hơi ấm giữa không gian vô tận này.',
-        'Tín hiệu của bạn đã được tiếp nhận. Vũ trụ đang gửi lại cho bạn một lời hồi đáp bình yên. ',
+        'Tín hiệu của bạn đã được tiếp nhận. Vũ trụ đang gửi lại cho bạn một lời hồi đáp bình yên.',
         'Vũ trụ không im lặng. Đó là một bản nhạc không lời, chỉ cần lắng nghe bằng cả tâm hồn, bạn sẽ nghe thấy nhịp thở của ngàn vì sao.'
-
     ],
 
     // Timing
@@ -113,8 +112,57 @@ const CONFIG = {
     VOID_HOLD_DURATION: 10000,
     PATIENT_DURATION: 30 * 60 * 1000,
 
-    // Negative keywords
-    NEGATIVE_KEYWORDS: ['mệt', 'buồn', 'khóc', 'cô đơn', 'chán', 'tệ', 'sợ', 'lo', 'áp lực', 'stress', 'đau', 'thất bại', 'tuyệt vọng']
+    // Từ tiêu cực — đánh dấu sao cần được quan tâm
+    NEGATIVE_KEYWORDS: [
+        // Cảm xúc cơ bản
+        'mệt', 'buồn', 'khóc', 'cô đơn', 'chán', 'tệ', 'sợ', 'lo',
+        'áp lực', 'stress', 'đau', 'thất bại', 'tuyệt vọng', 'bất lực',
+        'trống rỗng', 'vô nghĩa', 'vô dụng', 'vô vọng', 'lạc lõng',
+        'hoang mang', 'bế tắc', 'mệt mỏi', 'kiệt sức', 'nản',
+        // Tự ti
+        'ghét bản thân', 'ghét mình', 'xấu hổ', 'tự ti', 'kém cỏi',
+        'không xứng', 'không đủ tốt', 'hối hận', 'ân hận', 'tội lỗi',
+        // Cô đơn / bị bỏ rơi
+        'không ai hiểu', 'không ai quan tâm', 'bị bỏ rơi', 'bị phản bội',
+        'một mình', 'nhớ nhà', 'bị lãng quên', 'xa cách',
+        // Lo âu
+        'hoảng loạn', 'lo lắng', 'sợ hãi', 'ám ảnh', 'bất an',
+        'không yên', 'ức chế', 'bực bội',
+        // Kiệt sức
+        'burn out', 'burnout', 'đuối', 'ngộp', 'tụt mood', 'down',
+        'overthink', 'suy sụp', 'gục ngã', 'tan vỡ',
+        'chịu không nổi', 'quá sức', 'không còn sức'
+    ],
+
+    // Từ khủng hoảng — hiện thông báo hỗ trợ đặc biệt, vẫn cho gửi
+    CRISIS_KEYWORDS: [
+        'không muốn sống', 'không muốn tiếp tục', 'muốn biến mất',
+        'muốn chết', 'tự tử', 'kết thúc tất cả', 'không còn lý do sống',
+        'bỏ lại tất cả', 'ra đi mãi mãi', 'không muốn tồn tại',
+        'chán sống', 'sống để làm gì', 'còn sống làm gì'
+    ],
+
+    // Từ toxic đơn — chặn không cho gửi
+    TOXIC_KEYWORDS: [
+        'đần', 'dốt', 'óc chó', 'bại não', 'súc vật',
+        'vcl', 'vch', 'hãm', 'bê đê',
+        'ngu si', 'rẻ rác', 'đồ bỏ đi', 'đồ vứt đi',
+        'đồ chết tiệt', 'đồ khốn', 'đồ vô dụng',
+        'đồ thất bại', 'đồ tệ hại', 'khốn nạn',
+        'địt', 'lồn', 'cặc', 'đéo', 'đụ', 'buồi',
+        'vãi lồn', 'vãi cặc', 'đm', 'đmm', 'dmm', 'dm',
+        'con chó', 'con lợn', 'đồ chó', 'thằng chó',
+        'mặt lồn', 'thằng điên', 'con điên', 'đứa điên'
+    ],
+
+    // Cụm từ toxic — chỉ block khi đi cùng nhau (tránh chặn sai 'mày'/'tao' đơn lẻ)
+    TOXIC_PHRASES: [
+        'mày chết', 'tao ghét mày', 'tao khinh mày',
+        'mày ngu', 'mày dốt', 'mày tệ',
+        'giết mày', 'đánh mày', 'muốn giết',
+        'đồ ngu', 'đồ ngốc', 'thằng ngu', 'con ngu',
+        'thằng hèn', 'con hèn', 'thằng bẩn', 'con bẩn'
+    ]
 };
 
 // Global state
