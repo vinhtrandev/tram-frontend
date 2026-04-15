@@ -8,6 +8,9 @@
    + v4: Lọc toxic / crisis keywords
    + v5: Fix toxic block hoàn chỉnh — null-safe guards,
          TOXIC_PHRASES support, return false khi bị chặn
+   + v6: React 1 lần/người — localStorage tracking,
+         polling sync reactions mọi người thấy,
+         rollback nếu API lỗi
    ================================================ */
 
 const Stars = (() => {
@@ -53,6 +56,31 @@ const Stars = (() => {
         }
 
         return false;
+    }
+
+    /* ================================================================
+       REACT TRACKING — localStorage, key: react_{userId}_{starId}_{type}
+       Mỗi user chỉ được react 1 lần / star / loại
+       ================================================================ */
+
+    function _getReactKey(starId, type) {
+        const uid = STATE.user?.id || 'anon';
+        return `react_${uid}_${starId}_${type}`;
+    }
+
+    function _hasReacted(starId, type) {
+        if (!starId) return false;
+        return localStorage.getItem(_getReactKey(starId, type)) === '1';
+    }
+
+    function _markReacted(starId, type) {
+        if (!starId) return;
+        localStorage.setItem(_getReactKey(starId, type), '1');
+    }
+
+    function _unmarkReacted(starId, type) {
+        if (!starId) return;
+        localStorage.removeItem(_getReactKey(starId, type));
     }
 
     /* ================================================================
@@ -324,6 +352,7 @@ const Stars = (() => {
         if (cntHug) { cntHug.textContent = `❤️ ${r.hug || 0}`; cntHug.classList.toggle('has-reacts', (r.hug || 0) > 0); }
         if (cntStrong) { cntStrong.textContent = `⚡ ${r.strong || 0}`; cntStrong.classList.toggle('has-reacts', (r.strong || 0) > 0); }
 
+        // Reset tất cả nút trước
         popup.querySelectorAll('.react-btn').forEach(btn => btn.classList.remove('reacted', 'just-reacted'));
 
         _positionPopup(popup, el);
@@ -361,32 +390,52 @@ const Stars = (() => {
         popup.classList.add('hidden');
     }
 
+    /* ================================================================
+       BIND REACT BUTTONS
+       — Mỗi user chỉ react 1 lần / star / loại
+       — Restore trạng thái đã react từ localStorage khi mở popup
+       — Rollback nếu API lỗi
+       ================================================================ */
     function _bindReactButtons(popup) {
+        const data = popup._currentStar;
+
         popup.querySelectorAll('.react-btn').forEach(btn => {
             const newBtn = btn.cloneNode(true);
             btn.parentNode.replaceChild(newBtn, btn);
 
+            const reaction = newBtn.dataset.reaction;
+
+            // ── Restore trạng thái đã react từ localStorage ──
+            if (data?.id && _hasReacted(data.id, reaction)) {
+                newBtn.classList.add('reacted');
+            } else {
+                newBtn.classList.remove('reacted');
+            }
+
             newBtn.addEventListener('click', async () => {
-                const data = popup._currentStar;
-                const el = popup._currentEl;
                 if (!data) return;
 
-                const reaction = newBtn.dataset.reaction;
-                const wasReacted = newBtn.classList.contains('reacted');
-                newBtn.classList.toggle('reacted', !wasReacted);
-                newBtn.classList.add('just-reacted');
+                const el = popup._currentEl;
+
+                // ── Chặn react nhiều lần ──
+                if (_hasReacted(data.id, reaction)) {
+                    UI.showToast('💫 Bạn đã gửi cảm xúc này rồi!', 2000);
+                    return;
+                }
+
+                // ── Optimistic UI update ──
+                newBtn.classList.add('reacted', 'just-reacted');
                 setTimeout(() => newBtn.classList.remove('just-reacted'), 450);
 
                 if (!data.reactions) data.reactions = {};
-                const delta = wasReacted ? -1 : 1;
-                data.reactions[reaction] = Math.max(0, (data.reactions[reaction] || 0) + delta);
+                data.reactions[reaction] = (data.reactions[reaction] || 0) + 1;
 
                 const emojiMap = { listen: '🕯️', hug: '❤️', strong: '⚡' };
                 const countIdMap = { listen: 'count-listen', hug: 'count-hug', strong: 'count-strong' };
                 const countEl = document.getElementById(countIdMap[reaction]);
                 if (countEl) {
                     countEl.textContent = `${emojiMap[reaction]} ${data.reactions[reaction]}`;
-                    countEl.classList.toggle('has-reacts', data.reactions[reaction] > 0);
+                    countEl.classList.add('has-reacts');
                 }
 
                 _updateBadge(data);
@@ -396,22 +445,41 @@ const Stars = (() => {
                     setTimeout(() => { el.style.boxShadow = ''; }, 1200);
                 }
 
-                await _sendReaction(data.id, reaction);
+                // ── Ghi nhớ đã react TRƯỚC khi gọi API (tránh double-click) ──
+                _markReacted(data.id, reaction);
+
+                const ok = await _sendReaction(data.id, reaction);
+
+                // ── Nếu API lỗi → rollback hoàn toàn ──
+                if (ok === false) {
+                    _unmarkReacted(data.id, reaction);
+                    data.reactions[reaction] = Math.max(0, (data.reactions[reaction] || 1) - 1);
+                    newBtn.classList.remove('reacted');
+                    if (countEl) {
+                        countEl.textContent = `${emojiMap[reaction]} ${data.reactions[reaction]}`;
+                        countEl.classList.toggle('has-reacts', data.reactions[reaction] > 0);
+                    }
+                    _updateBadge(data);
+                    UI.showToast('⚠️ Không thể gửi, thử lại sau', 2000);
+                    return;
+                }
 
                 if (data.isNegative) Missions.progress('light_hope', 1);
 
                 const labels = { listen: 'Lắng nghe 🕯️', hug: 'Cái ôm ❤️', strong: 'Mạnh mẽ ⚡' };
                 UI.showToast(`Đã gửi: ${labels[reaction] || '💫'}`);
-
                 setTimeout(() => popup.classList.add('hidden'), 800);
             });
         });
     }
 
+    /* ================================================================
+       SEND REACTION — trả về true/false để caller có thể rollback
+       ================================================================ */
     async function _sendReaction(starId, type) {
-        if (!starId) return;
+        if (!starId) return false;
         try {
-            await fetch(`${CONFIG.API_BASE}/stars/${starId}/react`, {
+            const res = await fetch(`${CONFIG.API_BASE}/stars/${starId}/react`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -419,9 +487,13 @@ const Stars = (() => {
                 },
                 body: JSON.stringify({ type })
             });
+            if (!res.ok) return false;
             await _syncPointsFromServer();
             UI.updateHUD();
-        } catch { }
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /* ================================================================
@@ -457,6 +529,8 @@ const Stars = (() => {
 
     /* ================================================================
        POLLING REALTIME
+       — Thêm star mới từ người khác (có fly animation)
+       — Sync reactions cho star đã tồn tại → mọi người thấy số cập nhật
        ================================================================ */
     function startPolling(intervalMs = 15000) {
         if (_pollingInterval) clearInterval(_pollingInterval);
@@ -476,9 +550,50 @@ const Stars = (() => {
                 const myId = STATE.user?.id;
 
                 list.forEach(s => {
-                    const exists = domStars.find(d => d.data.id && s.id && String(d.data.id) === String(s.id));
-                    if (exists) return;
+                    const exists = domStars.find(
+                        d => d.data.id && s.id && String(d.data.id) === String(s.id)
+                    );
 
+                    // ── Sync reactions cho star ĐÃ TỒN TẠI ──
+                    if (exists) {
+                        const newReactions = {
+                            listen: s.listenCount || 0,
+                            hug: s.hugCount || 0,
+                            strong: s.strongCount || 0
+                        };
+                        const old = exists.data.reactions || {};
+                        const changed =
+                            old.listen !== newReactions.listen ||
+                            old.hug !== newReactions.hug ||
+                            old.strong !== newReactions.strong;
+
+                        if (changed) {
+                            exists.data.reactions = newReactions;
+                            _updateBadge(exists.data);
+
+                            // Nếu popup đang mở cho star này → cập nhật luôn số đếm
+                            const popup = document.getElementById('star-popup');
+                            if (popup && !popup.classList.contains('hidden') &&
+                                popup._currentStar?.id &&
+                                String(popup._currentStar.id) === String(s.id)) {
+
+                                const emojiMap = { listen: '🕯️', hug: '❤️', strong: '⚡' };
+                                const countIdMap = { listen: 'count-listen', hug: 'count-hug', strong: 'count-strong' };
+                                ['listen', 'hug', 'strong'].forEach(type => {
+                                    const el = document.getElementById(countIdMap[type]);
+                                    if (el) {
+                                        el.textContent = `${emojiMap[type]} ${newReactions[type]}`;
+                                        el.classList.toggle('has-reacts', newReactions[type] > 0);
+                                    }
+                                });
+                                // Sync lại data object trong popup
+                                popup._currentStar.reactions = newReactions;
+                            }
+                        }
+                        return;
+                    }
+
+                    // ── Star MỚI chưa có trên màn — thêm vào với fly animation ──
                     if (s.x == null) s.x = 5 + Math.random() * 88;
                     if (s.y == null) s.y = 5 + Math.random() * 70;
                     if (!s.size) s.size = 3 + Math.random() * 5;
