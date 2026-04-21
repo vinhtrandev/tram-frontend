@@ -604,13 +604,33 @@ const Missions = (() => {
             else panel.insertBefore(hint, panel.firstChild);
         }
 
-        // Validate: cần ≥ 3 dòng, ghi đè nút Gửi tạm thời
+        // Validate: cần ≥ 3 dòng VÀ chứa cảm xúc tiêu cực
         const _onInput = () => {
-            const lines = textarea.value.split('\n').filter(l => l.trim()).length;
-            const enough = lines >= 3;
+            const text = textarea.value;
+            const lines = text.split('\n').filter(l => l.trim()).length;
+            const isNeg = TextFilter.isNegative(text) || TextFilter.hasMood(text);
+            const enough = lines >= 3 && isNeg;
             btnSend.disabled = !enough;
             btnSend.style.opacity = enough ? '1' : '.5';
             const countEl = document.getElementById('void-neg-linecount');
+            const negHint = document.getElementById('void-neg-sentiment-hint');
+
+            // Hiển thị gợi ý nếu đủ dòng nhưng không đủ tiêu cực
+            if (lines >= 3 && !isNeg) {
+                if (!negHint) {
+                    const h = document.createElement('div');
+                    h.id = 'void-neg-sentiment-hint';
+                    h.style.cssText = `font-size:.75rem;color:rgba(255,180,80,.75);
+                        text-align:left;margin-top:4px;padding:4px 8px;
+                        background:rgba(255,140,0,.08);border-radius:6px;
+                        border:1px solid rgba(255,160,0,.2);line-height:1.5;`;
+                    h.textContent = '💛 Hố Đen chỉ hút được suy nghĩ tiêu cực của bạn. Hãy viết thật lòng về nỗi buồn, áp lực, hay điều đang làm bạn mệt mỏi…';
+                    textarea.insertAdjacentElement('afterend', h);
+                }
+            } else {
+                negHint?.remove();
+            }
+
             if (countEl) countEl.textContent = `${lines} / 3 dòng`;
         };
 
@@ -640,6 +660,7 @@ const Missions = (() => {
             btnSend.style.opacity = '';
             hint?.remove();
             countEl?.remove();
+            document.getElementById('void-neg-sentiment-hint')?.remove();
             // Lấy text vừa gửi (textarea đã bị xoá bởi _close, dùng cache)
             _spawnDraggableNegStar(_lastNegText || '');
         };
@@ -655,6 +676,12 @@ const Missions = (() => {
     function _spawnDraggableNegStar(text) {
         const voidEl = document.getElementById('void');
         if (!voidEl) { complete('void_negative'); return; }
+
+        // Chỉ cho phép suy nghĩ tiêu cực thật sự được ném vào hố đen
+        if (text && !TextFilter.isNegative(text) && !TextFilter.hasMood(text)) {
+            UI.showToast('💛 Hố Đen chỉ nhận suy nghĩ tiêu cực thật sự. Hãy viết thật lòng về nỗi buồn của bạn.', 4000);
+            return;
+        }
 
         const star = document.createElement('div');
         star.id = 'neg-drag-star';
@@ -925,6 +952,10 @@ const Missions = (() => {
             toggleBtn.classList.remove('is-hidden');
             textarea.value = ''; charCount.textContent = '0';
             _hideMoodHint();
+            // Dọn dẹp các element của void_negative nếu còn
+            document.getElementById('void-neg-hint')?.remove();
+            document.getElementById('void-neg-linecount')?.remove();
+            document.getElementById('void-neg-sentiment-hint')?.remove();
         };
 
         btnCancel.addEventListener('click', _close);

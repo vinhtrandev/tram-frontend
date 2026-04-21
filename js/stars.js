@@ -42,6 +42,9 @@ const Stars = (() => {
     const _markReacted = (id, type) => id && localStorage.setItem(_reactKey(id, type), '1');
     const _unmarkReacted = (id, type) => id && localStorage.removeItem(_reactKey(id, type));
 
+    // Track các star buồn đã được thắp sáng trong session này (để đếm đúng cho mission)
+    const _litHopeStars = new Set();
+
     /* ================================================================
        POINTS SYNC
        ================================================================ */
@@ -74,12 +77,14 @@ const Stars = (() => {
         if (s.y == null) s.y = 5 + Math.random() * 70;
         if (!s.size) s.size = 3 + Math.random() * 5;
         if (!s.opacity) s.opacity = 0.5 + Math.random() * 0.5;
-
-        // FIX: đảm bảo type luôn là string hợp lệ trước khi dùng
         if (!s.type || typeof s.type !== 'string' || !CONFIG.STAR_TYPES[s.type]) s.type = 'shooting';
-
-        // FIX: đảm bảo text không bao giờ undefined
         if (!s.text) s.text = '';
+
+        // FIX: map negative → isNegative (server trả về "negative", code dùng "isNegative")
+        if (s.isNegative == null) s.isNegative = s.negative || false;
+
+        // FIX: map moodPost → isMoodPost
+        s.isMoodPost = s.isMoodPost || s.moodPost || false;
 
         s.reactions = {
             listen: s.listenCount || 0,
@@ -89,8 +94,6 @@ const Stars = (() => {
             feel: s.feelCount || 0,
             thanks: s.thanksCount || 0,
         };
-        // Normalize moodPost — server trả về "moodPost", hỗ trợ cả "isMoodPost"
-        s.isMoodPost = s.isMoodPost || s.moodPost || false;
         return s;
     }
 
@@ -366,9 +369,13 @@ const Stars = (() => {
                 ? data.myReactions.includes(reaction)
                 : (data.myReactions instanceof Set ? data.myReactions.has(reaction) : false);
 
-            if (reactedOnServer || (data?.id && _hasReacted(data.id, reaction))) {
+            // Dong bo server -> localStorage (chi set, khong xoa -
+            // tranh ghi de truong hop user vua un-react nhung server chua cap nhat kip)
+            if (reactedOnServer && data?.id) _markReacted(data.id, reaction);
+
+            const alreadyLocal = data?.id ? _hasReacted(data.id, reaction) : false;
+            if (reactedOnServer || alreadyLocal) {
                 fresh.classList.add('reacted');
-                if (data?.id) _markReacted(data.id, reaction);
             }
 
             fresh.addEventListener('click', async () => {
@@ -405,7 +412,15 @@ const Stars = (() => {
                 _updateBadge(data);
 
                 if (!data.id) {
-                    if (!alreadyReacted && data.isNegative) Missions.progress('light_hope', 1);
+                    if (!alreadyReacted && (data.isNegative || data.isMoodPost)) {
+                        // Dùng text làm key vì không có id
+                        const hopeKey = `hope_noid_${data.text}`;
+                        if (!_litHopeStars.has(hopeKey)) {
+                            _litHopeStars.add(hopeKey);
+                            const cur = (STATE.dailyMissions?.['light_hope'] || 0) + 1;
+                            Missions.progress('light_hope', cur);
+                        }
+                    }
                     if (!alreadyReacted) UI.showToast(`Đã gửi: ${labelMap[reaction] || '💫'}`);
                     else UI.showToast('↩️ Đã hủy cảm xúc', 1800);
                     return;
@@ -435,7 +450,14 @@ const Stars = (() => {
                 }
 
                 if (!alreadyReacted) {
-                    if (data.isNegative) Missions.progress('light_hope', 1);
+                    if (data.isNegative || data.isMoodPost) {
+                        const hopeKey = `hope_${data.id}`;
+                        if (!_litHopeStars.has(hopeKey)) {
+                            _litHopeStars.add(hopeKey);
+                            const cur = (STATE.dailyMissions?.['light_hope'] || 0) + 1;
+                            Missions.progress('light_hope', cur);
+                        }
+                    }
                     if (reaction === 'listen' && !data.isOwn) Missions.onCandleLit?.();
                     if (reaction === 'hug' && data.type === 'shooting' && !data.isOwn) {
                         const ageMs = data.createdAt ? Date.now() - new Date(data.createdAt).getTime() : 0;
@@ -741,12 +763,14 @@ const Stars = (() => {
                         thanks: s.thanksCount || 0,
                     };
                     const oldR = entry.data.reactions || {};
+                    // Luôn sync myReactions từ server, không phụ thuộc count thay đổi
+                    if (s.myReactions) entry.data.myReactions = s.myReactions;
+
                     if (oldR.listen !== newR.listen || oldR.hug !== newR.hug ||
                         oldR.strong !== newR.strong || oldR.treasure !== newR.treasure ||
                         oldR.feel !== newR.feel || oldR.thanks !== newR.thanks) {
                         entry.data.reactions = newR;
                         _updateBadge(entry.data);
-                        if (s.myReactions) entry.data.myReactions = s.myReactions;
 
                         const popup = document.getElementById('star-popup');
                         if (popup && !popup.classList.contains('hidden') &&
