@@ -137,7 +137,6 @@
         0 0 0 1px rgba(80, 40, 160, 0.20),
         inset 0 0 40px rgba(0, 0, 0, 1),
         inset 0 0 10px rgba(40, 0, 80, 0.4);
-    /* Subtle lens distortion shimmer */
     overflow: hidden;
 }
 
@@ -380,14 +379,12 @@
    SUCK-IN ANIMATION — ngôi sao bị hút vào hố đen
    ================================================================ */
 
-/* Star đang bị hút: thêm class void-sucking vào .star-wrapper */
 .star-wrapper.void-sucking {
     pointer-events: none;
     z-index: 450 !important;
     animation: none !important;
 }
 
-/* Particle vệt sáng bay vào hố đen */
 .void-particle {
     position: fixed;
     border-radius: 50%;
@@ -396,7 +393,6 @@
     will-change: transform, opacity;
 }
 
-/* Flash trắng khi ngôi sao vào lõi */
 .void-impact-flash {
     position: fixed;
     border-radius: 50%;
@@ -428,7 +424,6 @@
     }
 }
 
-/* Ripple vòng tròn sóng hấp dẫn */
 .void-gravity-wave {
     position: fixed;
     border-radius: 50%;
@@ -451,7 +446,6 @@
     }
 }
 
-/* Text "+X ngôi sao bị hút" */
 .void-absorb-count {
     position: fixed;
     font-size: 0.75rem;
@@ -487,7 +481,6 @@
     }
 }
 
-/* ── Release explosion ── */
 .void-release-burst {
     position: fixed;
     border-radius: 50%;
@@ -519,7 +512,6 @@
     }
 }
 
-/* Ngôi sao bắn ra sau khi release */
 .void-ejected-star {
     position: fixed;
     border-radius: 50%;
@@ -528,6 +520,58 @@
     will-change: transform, opacity;
     background: radial-gradient(circle, #fff 0%, rgba(200, 150, 255, 0.6) 60%, transparent 100%);
     box-shadow: 0 0 8px 3px rgba(200, 140, 255, 0.7);
+}
+
+/* ================================================================
+   DRAG-TO-VOID — kéo ngôi sao thả vào hố đen
+   ================================================================ */
+
+/* Hố đen sáng lên khi ngôi sao được kéo đến gần */
+.void.void-drag-target .void-accretion {
+    animation-duration: 1.8s;
+    filter: brightness(2.2) saturate(1.6);
+}
+
+.void.void-drag-target .void-photon-ring {
+    animation-duration: 1.2s;
+    filter: brightness(2.8);
+}
+
+.void.void-drag-target .void-glow-outer {
+    filter: blur(0.5px) brightness(3.5);
+}
+
+.void.void-drag-target .void-shadow {
+    box-shadow:
+        0 0 0 2px rgba(200, 100, 255, 0.7),
+        0 0 30px 10px rgba(160, 60, 255, 0.4),
+        inset 0 0 60px rgba(80, 0, 160, 0.7),
+        inset 0 0 20px rgba(140, 0, 255, 0.5);
+}
+
+.void.void-drag-target .void-core::after {
+    box-shadow:
+        0 0 14px 5px rgba(255, 200, 255, 1),
+        0 0 40px 12px rgba(200, 100, 255, 0.9),
+        0 0 70px 20px rgba(140, 40, 255, 0.6);
+    transform: scale(2.5);
+}
+
+/* Pulse để báo "thả vào đây" */
+@keyframes voidPulseInvite {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.06);
+    }
+}
+
+.void.void-drag-target {
+    animation: voidPulseInvite 0.7s ease-in-out infinite;
 }
 
 /* ================================================================

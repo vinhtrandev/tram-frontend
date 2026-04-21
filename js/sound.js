@@ -29,34 +29,71 @@ const Sound = (() => {
         return ctx;
     }
 
+    /* ✅ FIX: Resume AudioContext trước khi play — tránh bị suspend lần đầu */
+    async function _resumeCtx() {
+        const c = _getCtx();
+        if (c.state === 'suspended') {
+            await c.resume();
+        }
+        return c;
+    }
+
     /* ============================================================
-       BACKGROUND MUSIC — file MP3
+       AUDIO FILE URLs — ĐỔI LINK CỦA BẠN VÀO ĐÂY
+    ============================================================ */
+    const AUDIO_URLS = {
+        // Nhạc nền chính — đổi thành link file nhạc nền của bạn
+        bgm: 'nhacnen.mp3',
+
+        // 3 âm thanh ASMR quy đổi sao — đổi thành link drive của bạn
+        rain: 'mua.mp3',
+        wave: 'song.mp3',
+        wind: 'chuong.mp3',
+    };
+
+    /*
+     * HƯỚNG DẪN LẤY LINK GOOGLE DRIVE:
+     * 1. Upload file lên Drive → chuột phải → "Chia sẻ" → "Bất kỳ ai có đường liên kết"
+     * 2. Lấy ID từ URL:  https://drive.google.com/file/d/  <<<ID>>>  /view
+     * 3. Dán vào đây theo dạng:
+     *    'https://drive.google.com/uc?export=download&id=<<<ID>>>'
+     *
+     * Ví dụ:
+     *    bgm:  'https://drive.google.com/uc?export=download&id=1A2B3C4D5E6F7G8H'
+     *    rain: 'https://drive.google.com/uc?export=download&id=9I8H7G6F5E4D3C2B'
+     */
+
+    /* ============================================================
+       BACKGROUND MUSIC — file MP3/OGG
     ============================================================ */
 
     function startBGM() {
         if (bgmActive) return;
 
         if (!bgmAudio) {
-            bgmAudio = new Audio('nhacnen.mp3');
+            bgmAudio = new Audio(AUDIO_URLS.bgm);
             bgmAudio.loop = true;
             bgmAudio.volume = 0;
+            bgmAudio.crossOrigin = 'anonymous';
+            bgmAudio.preload = 'auto';
         }
 
-        const tryPlay = () => {
-            bgmAudio.play().then(() => {
-                bgmActive = true;
-                _fadeVolume(bgmAudio, 0, 0.3, 1500);
-                _updateBGMBtn(true);
-            }).catch(() => { });
-        };
-
-        tryPlay();
-
-        // Nếu autoplay bị chặn, thử lại ở lần tương tác đầu tiên
-        if (!bgmActive) {
+        /* ✅ FIX: Resume context trước, rồi mới play — không cần retry nữa */
+        _resumeCtx().then(() => {
+            return bgmAudio.play();
+        }).then(() => {
+            bgmActive = true;
+            _fadeVolume(bgmAudio, 0, 0.3, 1500);
+            _updateBGMBtn(true);
+        }).catch(() => {
+            /* Autoplay vẫn bị chặn (chưa có interaction) — thử lại lần đầu click/key */
             const retry = () => {
                 if (bgmActive) return;
-                tryPlay();
+                _resumeCtx().then(() => bgmAudio.play()).then(() => {
+                    bgmActive = true;
+                    _fadeVolume(bgmAudio, 0, 0.3, 1500);
+                    _updateBGMBtn(true);
+                }).catch(() => { });
                 document.removeEventListener('click', retry);
                 document.removeEventListener('keydown', retry);
                 document.removeEventListener('touchstart', retry);
@@ -64,7 +101,7 @@ const Sound = (() => {
             document.addEventListener('click', retry);
             document.addEventListener('keydown', retry);
             document.addEventListener('touchstart', retry);
-        }
+        });
     }
 
     function stopBGM(onDone) {
@@ -304,61 +341,46 @@ const Sound = (() => {
     }
 
     /* ============================================================
-       AMBIENT GENERATORS
+       AMBIENT — dùng file thực (không generate bằng Web Audio)
     ============================================================ */
 
-    function _createRainNoise() {
-        const c = _getCtx();
-        const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-        const src = c.createBufferSource();
-        src.buffer = buf; src.loop = true;
-        const filter = c.createBiquadFilter();
-        filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 0.5;
-        src.connect(filter);
-        return { src, output: filter };
-    }
+    let _ambientAudio = null;   // HTMLAudioElement hiện tại
 
-    function _createWaveNoise() {
-        const c = _getCtx();
-        const buf = c.createBuffer(1, c.sampleRate * 4, c.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-        const src = c.createBufferSource();
-        src.buffer = buf; src.loop = true;
-        const filter = c.createBiquadFilter();
-        filter.type = 'lowpass'; filter.frequency.value = 400;
-        const lfo = c.createOscillator();
-        const lfoGain = c.createGain();
-        lfo.frequency.value = 0.12; lfoGain.gain.value = 200;
-        lfo.connect(lfoGain); lfoGain.connect(filter.frequency);
-        lfo.start();
-        src.connect(filter);
-        return { src, output: filter, extra: [lfo] };
-    }
-
-    function _createWindChime() {
-        const c = _getCtx();
-        const notes = [523, 659, 784, 880, 1047];
-
-        function ring() {
-            if (!ctx) return;
-            const freq = notes[Math.floor(Math.random() * notes.length)];
-            const osc = c.createOscillator();
-            const env = c.createGain();
-            osc.type = 'sine'; osc.frequency.value = freq;
-            env.gain.setValueAtTime(0, c.currentTime);
-            env.gain.linearRampToValueAtTime(0.15, c.currentTime + 0.05);
-            env.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 2);
-            osc.connect(env); env.connect(gainNode);
-            osc.start(); osc.stop(c.currentTime + 2.5);
-            setTimeout(ring, 800 + Math.random() * 3000);
+    function _startAmbient(type) {
+        const url = AUDIO_URLS[type];
+        if (!url || url.startsWith('LINK_')) {
+            console.warn(`[Sound] Chưa có link file cho "${type}". Điền vào AUDIO_URLS.`);
+            UI?.showToast?.('⚠️ Chưa có file âm thanh, vui lòng cấu hình link!', 3000);
+            return;
         }
-        setTimeout(ring, 500);
-        const merger = c.createChannelMerger(1);
-        return { src: { start: () => { }, stop: () => { } }, output: merger };
+
+        /* ✅ FIX: Dừng ambient cũ XONG rồi mới start cái mới */
+        _stopAmbient(() => {
+            _ambientAudio = new Audio(url);
+            _ambientAudio.loop = true;
+            _ambientAudio.volume = 0;
+            _ambientAudio.crossOrigin = 'anonymous';
+            _ambientAudio.preload = 'auto';
+
+            _resumeCtx().then(() => {
+                return _ambientAudio.play();
+            }).then(() => {
+                _fadeVolume(_ambientAudio, 0, 0.45, 1200);
+            }).catch(err => console.warn('[Sound] ambient play error:', err));
+        });
     }
+
+    function _stopAmbient(onDone) {
+        if (!_ambientAudio) { if (onDone) onDone(); return; }
+        _fadeVolume(_ambientAudio, _ambientAudio.volume, 0, 400, () => {
+            _ambientAudio.pause();
+            _ambientAudio.src = '';
+            _ambientAudio = null;
+            if (onDone) onDone();
+        });
+    }
+
+    function stop() { _stopAmbient(); }
 
     /* ---------- PLAY AMBIENT ---------- */
     function playAmbient(type) {
@@ -369,43 +391,13 @@ const Sound = (() => {
             return;
         }
 
+        /* ✅ FIX: Dừng BGM + ambient cũ trước, rồi mới start — tránh phải click 2 lần */
         if (bgmActive) {
             stopBGM(() => _startAmbient(type));
         } else {
-            _startAmbient(type);
+            _startAmbient(type); // _startAmbient đã tự gọi _stopAmbient có callback bên trong
         }
     }
-
-    function _startAmbient(type) {
-        _stopAmbient();
-        const c = _getCtx();
-        gainNode = c.createGain();
-        gainNode.gain.value = 0.15;
-        gainNode.connect(c.destination);
-
-        let node;
-        try {
-            if (type === 'rain') node = _createRainNoise();
-            if (type === 'wave') node = _createWaveNoise();
-            if (type === 'wind') { _createWindChime(); return; }
-            if (node) {
-                node.output.connect(gainNode);
-                node.src.start();
-                currentNode = node;
-            }
-        } catch { }
-    }
-
-    function _stopAmbient() {
-        try {
-            if (currentNode?.src) currentNode.src.stop();
-            if (currentNode?.extra) currentNode.extra.forEach(n => n.stop());
-            if (gainNode) gainNode.disconnect();
-        } catch { }
-        currentNode = null; gainNode = null;
-    }
-
-    function stop() { _stopAmbient(); }
 
     /* ---------- BELL ---------- */
     function playBell() {
@@ -500,6 +492,9 @@ const Sound = (() => {
     function initButtons() {
         document.querySelectorAll('.sound-btn').forEach(btn => {
             btn.addEventListener('click', () => {
+                /* ✅ FIX: Resume AudioContext ngay khi click — trước mọi thứ khác */
+                _resumeCtx();
+
                 const type = btn.dataset.sound;
 
                 if (!_isUnlocked(type)) {
@@ -532,6 +527,9 @@ const Sound = (() => {
         const bgmBtn = document.getElementById('bgm-toggle-btn');
         if (bgmBtn) {
             bgmBtn.addEventListener('click', () => {
+                /* ✅ FIX: Resume AudioContext ngay khi click */
+                _resumeCtx();
+
                 if (bgmActive) {
                     stopBGM();
                     UI.showToast('🔇 Nhạc nền đã tắt', 2000);

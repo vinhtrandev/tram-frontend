@@ -92,7 +92,13 @@ canvas {
    LANDING
    ============================== */
 #landing-screen {
-    background: radial-gradient(ellipse at 60% 40%, #1A1B2E 0%, #080B12 70%);
+    background:
+        radial-gradient(ellipse 65% 50% at 75% 15%,
+            rgba(60, 14, 130, 0.30) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 45% at 15% 80%,
+            rgba(10, 35, 95, 0.28) 0%, transparent 60%),
+        radial-gradient(ellipse 80% 60% at 50% 45%,
+            #141628 0%, #0a0c1a 50%, #050710 100%);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -333,10 +339,259 @@ canvas {
 }
 
 /* ==============================
-   MAIN SCREEN
+   MAIN SCREEN — Deep Space Background v2
    ============================== */
 #main-screen {
-    background: radial-gradient(ellipse at 50% 10%, #1A1B2E 0%, #080B12 65%);
+    background:
+        radial-gradient(ellipse 70% 55% at 82% 8%,
+            rgba(72, 14, 140, 0.28) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 50% at 12% 88%,
+            rgba(10, 40, 100, 0.32) 0%, transparent 60%),
+        radial-gradient(ellipse 45% 35% at 90% 52%,
+            rgba(100, 14, 60, 0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 40% 30% at 8% 18%,
+            rgba(8, 50, 80, 0.22) 0%, transparent 60%),
+        radial-gradient(ellipse 100% 70% at 50% 0%,
+            #141628 0%, #0a0d1a 45%, #050810 100%);
+    isolation: isolate;
+}
+
+/* Lớp sao tĩnh — CSS thuần */
+#main-screen::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+        radial-gradient(1px 1px at 12% 15%, rgba(255, 255, 255, 0.75) 0%, transparent 100%),
+        radial-gradient(1px 1px at 27% 8%, rgba(255, 255, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(1px 1px at 43% 22%, rgba(255, 255, 255, 0.65) 0%, transparent 100%),
+        radial-gradient(1px 1px at 58% 5%, rgba(255, 255, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 71% 18%, rgba(255, 255, 255, 0.70) 0%, transparent 100%),
+        radial-gradient(1px 1px at 85% 12%, rgba(255, 255, 255, 0.50) 0%, transparent 100%),
+        radial-gradient(1px 1px at 93% 28%, rgba(255, 255, 255, 0.60) 0%, transparent 100%),
+        radial-gradient(1px 1px at 6% 35%, rgba(255, 255, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 19% 42%, rgba(255, 255, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(1px 1px at 34% 38%, rgba(255, 255, 255, 0.40) 0%, transparent 100%),
+        radial-gradient(1px 1px at 52% 48%, rgba(255, 255, 255, 0.65) 0%, transparent 100%),
+        radial-gradient(1px 1px at 67% 33%, rgba(255, 255, 255, 0.50) 0%, transparent 100%),
+        radial-gradient(1px 1px at 79% 45%, rgba(255, 255, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 88% 38%, rgba(255, 255, 255, 0.60) 0%, transparent 100%),
+        radial-gradient(1px 1px at 4% 62%, rgba(255, 255, 255, 0.40) 0%, transparent 100%),
+        radial-gradient(1px 1px at 16% 58%, rgba(255, 255, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(1px 1px at 31% 68%, rgba(255, 255, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 46% 72%, rgba(255, 255, 255, 0.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 61% 65%, rgba(255, 255, 255, 0.50) 0%, transparent 100%),
+        radial-gradient(1px 1px at 74% 78%, rgba(255, 255, 255, 0.40) 0%, transparent 100%),
+        radial-gradient(1px 1px at 91% 62%, rgba(255, 255, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(1px 1px at 8% 82%, rgba(255, 255, 255, 0.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 22% 88%, rgba(255, 255, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 38% 92%, rgba(255, 255, 255, 0.30) 0%, transparent 100%),
+        radial-gradient(1px 1px at 55% 85%, rgba(255, 255, 255, 0.50) 0%, transparent 100%),
+        radial-gradient(1px 1px at 69% 90%, rgba(255, 255, 255, 0.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 83% 83%, rgba(255, 255, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1px 1px at 97% 75%, rgba(255, 255, 255, 0.40) 0%, transparent 100%),
+        /* Sao xanh nhạt */
+        radial-gradient(1.5px 1.5px at 23% 26%, rgba(168, 216, 255, 0.65) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 48% 14%, rgba(168, 216, 255, 0.50) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 76% 30%, rgba(168, 216, 255, 0.60) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 62% 55%, rgba(168, 216, 255, 0.45) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 14% 70%, rgba(168, 216, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 88% 68%, rgba(168, 216, 255, 0.40) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 37% 82%, rgba(168, 216, 255, 0.50) 0%, transparent 100%),
+        /* Sao vàng kem */
+        radial-gradient(2px 2px at 36% 11%, rgba(255, 248, 194, 0.80) 0%, transparent 100%),
+        radial-gradient(2px 2px at 63% 24%, rgba(255, 248, 194, 0.70) 0%, transparent 100%),
+        radial-gradient(2px 2px at 18% 52%, rgba(255, 248, 194, 0.60) 0%, transparent 100%),
+        radial-gradient(2px 2px at 81% 17%, rgba(255, 248, 194, 0.75) 0%, transparent 100%),
+        radial-gradient(2px 2px at 52% 76%, rgba(255, 248, 194, 0.55) 0%, transparent 100%),
+        /* Sao tím */
+        radial-gradient(1.5px 1.5px at 73% 58%, rgba(212, 184, 255, 0.60) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 28% 47%, rgba(212, 184, 255, 0.50) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 91% 44%, rgba(212, 184, 255, 0.55) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 44% 96%, rgba(212, 184, 255, 0.40) 0%, transparent 100%);
+    animation: staticStarsTwinkle 8s ease-in-out infinite alternate;
+}
+
+/* Dải Milky Way mờ */
+#main-screen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(108deg,
+            transparent 0%,
+            rgba(80, 40, 140, 0.04) 20%,
+            rgba(120, 70, 180, 0.08) 38%,
+            rgba(160, 100, 200, 0.05) 52%,
+            rgba(100, 60, 160, 0.03) 65%,
+            transparent 80%);
+    animation: milkyWayDrift 30s ease-in-out infinite alternate;
+}
+
+@keyframes staticStarsTwinkle {
+    0% {
+        opacity: 0.70;
+    }
+
+    25% {
+        opacity: 0.90;
+    }
+
+    60% {
+        opacity: 0.75;
+    }
+
+    100% {
+        opacity: 0.85;
+    }
+}
+
+@keyframes milkyWayDrift {
+    0% {
+        transform: rotate(-1deg) scaleX(1.0);
+        opacity: 0.6;
+    }
+
+    50% {
+        transform: rotate(0.5deg) scaleX(1.02);
+        opacity: 1;
+    }
+
+    100% {
+        transform: rotate(1deg) scaleX(0.99);
+        opacity: 0.75;
+    }
+}
+
+/* ── Nebula orbs động ── */
+.nebula-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(90px);
+    will-change: transform, opacity;
+    mix-blend-mode: screen;
+    z-index: 0;
+}
+
+.nebula-orb-1 {
+    width: 55vw;
+    height: 40vw;
+    top: -12vw;
+    right: -8vw;
+    background: radial-gradient(ellipse,
+            rgba(88, 28, 180, 0.22) 0%,
+            rgba(60, 12, 120, 0.10) 50%,
+            transparent 75%);
+    animation: nebOrbFloat1 22s ease-in-out infinite alternate;
+}
+
+.nebula-orb-2 {
+    width: 50vw;
+    height: 55vw;
+    bottom: -18vw;
+    left: -8vw;
+    background: radial-gradient(ellipse,
+            rgba(12, 50, 130, 0.24) 0%,
+            rgba(8, 30, 90, 0.10) 55%,
+            transparent 75%);
+    animation: nebOrbFloat2 28s ease-in-out infinite alternate;
+}
+
+.nebula-orb-3 {
+    width: 40vw;
+    height: 35vw;
+    top: 30%;
+    left: 28%;
+    background: radial-gradient(ellipse,
+            rgba(140, 30, 90, 0.11) 0%,
+            rgba(80, 15, 50, 0.06) 55%,
+            transparent 70%);
+    animation: nebOrbFloat3 35s ease-in-out infinite alternate;
+}
+
+/* Orb mới: aurora xanh lục mờ ở giữa-dưới */
+.nebula-orb-4 {
+    width: 38vw;
+    height: 28vw;
+    bottom: 5%;
+    right: 15%;
+    background: radial-gradient(ellipse,
+            rgba(14, 90, 100, 0.14) 0%,
+            rgba(8, 60, 70, 0.07) 55%,
+            transparent 75%);
+    animation: nebOrbFloat4 32s ease-in-out infinite alternate;
+}
+
+@keyframes nebOrbFloat1 {
+    0% {
+        transform: translate(0, 0) scale(1.0);
+        opacity: 0.75;
+    }
+
+    50% {
+        transform: translate(-3vw, 2vw) scale(1.08);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(2vw, -1vw) scale(0.96);
+        opacity: 0.80;
+    }
+}
+
+@keyframes nebOrbFloat2 {
+    0% {
+        transform: translate(0, 0) scale(1.0);
+        opacity: 0.80;
+    }
+
+    40% {
+        transform: translate(3vw, -2vw) scale(1.06);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-2vw, 1vw) scale(1.03);
+        opacity: 0.70;
+    }
+}
+
+@keyframes nebOrbFloat3 {
+    0% {
+        transform: translate(0, 0) scale(1.0);
+        opacity: 0.55;
+    }
+
+    60% {
+        transform: translate(-4vw, 3vw) scale(1.12);
+        opacity: 0.85;
+    }
+
+    100% {
+        transform: translate(3vw, -2vw) scale(0.94);
+        opacity: 0.65;
+    }
+}
+
+@keyframes nebOrbFloat4 {
+    0% {
+        transform: translate(0, 0) scale(1.0);
+        opacity: 0.60;
+    }
+
+    45% {
+        transform: translate(2vw, -1.5vw) scale(1.05);
+        opacity: 0.90;
+    }
+
+    100% {
+        transform: translate(-1.5vw, 2vw) scale(0.97);
+        opacity: 0.55;
+    }
 }
 
 /* ==============================

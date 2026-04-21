@@ -1,5 +1,5 @@
 /* ================================================
-   TRẠM GỬI TÍN HIỆU - app.js  [OPTIMISED + POLLING]
+   TRẠM GỬI TÍN HIỆU - app.js
    Main orchestrator: boot sequence, screen flow
    + Realtime polling sao mới từ người khác
    ================================================ */
@@ -80,7 +80,8 @@ const App = (() => {
         _injectPreviewCSS();
         _initStarTypeSelector();
 
-        _hookSendSignal();
+        // FIX: Không hook btn-send ở đây nữa — missions.js _initInput() đã xử lý hoàn toàn.
+        // Chỉ hook các custom event từ Stars/Void/Meteor.
         _hookShootingStar();
         _hookVoid();
         _hookMeteorRain();
@@ -90,8 +91,7 @@ const App = (() => {
         Stars.startShootingStarCycle();
         Stars.startMeteorRain();
 
-        // ── Bắt đầu polling realtime sao mới ──
-        Stars.startPolling(15000); // poll mỗi 15 giây
+        Stars.startPolling(15_000);
 
         Sound.initButtons();
 
@@ -546,29 +546,11 @@ const App = (() => {
         });
     }
 
-    function _hookSendSignal() {
-        const btn = document.getElementById('btn-send');
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-            const text = document.getElementById('signal-text')?.value?.trim();
-            if (!text) return;
-
-            const typeId = STATE.activeStarType || 'shooting';
-            const typeConf = CONFIG.STAR_TYPES[typeId];
-            const typeLabel = typeConf ? typeConf.emoji : '💫';
-            NotifSystem.add('earn', '+5', `Gửi tín hiệu ${typeLabel}`);
-
-            Stars.sendSignal(text, typeId);
-
-            const textarea = document.getElementById('signal-text');
-            if (textarea) textarea.value = '';
-            const counter = document.getElementById('char-count');
-            if (counter) counter.textContent = '0';
-
-            UI.addPoints(CONFIG.POINTS.SEND_SIGNAL);
-            Missions.progress('send_signal', 1);
-        }, false);
-    }
+    /*
+     * FIX: Bỏ _hookSendSignal() — missions.js _initInput() đã gắn listener
+     * cho btn-send và xử lý đầy đủ (toxic check, mood hint, +5 điểm, NotifSystem).
+     * Nếu giữ lại hook này, mỗi lần click btn-send sẽ gọi Stars.sendSignal() HAI LẦN.
+     */
 
     function _hookShootingStar() {
         document.addEventListener('shootingstar:caught', () => {
